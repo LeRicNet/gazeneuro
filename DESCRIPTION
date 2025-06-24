@@ -1,0 +1,33 @@
+Package: gazeneuro
+Title: Gaze Tracking and Neuroimaging Integration
+Version: 0.1.0
+Authors@R: 
+    person("Prince", "Eric", , "Eric.Prince@CUAnschutz.edu", role = c("aut", "cre"),
+           comment = c(ORCID = "0000-0001-7359-6608"))
+Description: Provides tools for integrating eye tracking gaze data with NIfTI 
+    neuroimaging files. Includes functions for temporal alignment, coordinate 
+    transformation, and visualization of gaze patterns on brain slices.
+License: MIT + file LICENSE
+Encoding: UTF-8
+LazyData: true
+Roxygen: list(markdown = TRUE)
+RoxygenNote: 7.3.2
+Imports:
+    R6,
+    Rcpp,
+    RNifti,
+    tidyverse,
+    ggplot2,
+    dplyr,
+    tidyr,
+    MASS
+LinkingTo: 
+    Rcpp
+Suggests: 
+    testthat (>= 3.0.0),
+    knitr,
+    rmarkdown
+Config/testthat/edition: 3
+VignetteBuilder: knitr
+URL: https://github.com/lericnet/gazeneuro
+BugReports: https://github.com/lericnet/gazeneuro/issues

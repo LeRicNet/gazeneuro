@@ -1,0 +1,191 @@
+---
+title: "Introduction to gazeneuro"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{Introduction to gazeneuro}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r, include = FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>"
+)
+```
+
+```{r setup}
+library(gazeneuro)
+library(tidyverse)
+```
+
+## Overview
+
+The `gazeneuro` package integrates eye tracking gaze data with NIfTI neuroimaging files. This vignette demonstrates the basic workflow for:
+
+1. Loading neuroimaging data
+2. Integrating gaze tracking data with slice viewing events
+3. Visualizing gaze patterns on brain slices
+4. Analyzing gaze behavior
+
+## Loading NIfTI Data
+
+First, load your NIfTI file using the `preload_nifti_data()` function:
+
+```{r, eval=FALSE}
+# Load NIfTI file
+nifti_data <- preload_nifti_data("path/to/your/brain.nii.gz")
+
+# The returned object contains:
+# - nifti: The RNifti object
+# - nvimage: NVImage object for coordinate transformations
+# - data: Pre-extracted image array for fast access
+# - dims: Image dimensions
+```
+
+## Integrating Gaze Data
+
+The package expects two data sources:
+
+1. **Gaze data**: Eye tracking data with timestamps and gaze coordinates
+2. **Z-axis data**: Events recording which brain slice was displayed when
+
+```{r, eval=FALSE}
+# Integrate the data
+integrated <- integrate_all_gaze_points(gaze_data, z_axis_data)
+
+# Check integration quality
+check_integration_quality(gaze_data, z_axis_data, integrated)
+```
+
+The integration process:
+- Normalizes timestamps to a common time base
+- Estimates and corrects for latency between the two data streams
+- Assigns each gaze point to the slice being viewed at that time
+
+## Basic Visualization
+
+### Single Slice with Gaze
+
+```{r, eval=FALSE}
+# Plot slice 12 with all associated gaze points
+gaze_points <- plot_slice_with_all_gaze(
+  nifti_data, 
+  integrated, 
+  slice_num = 12,
+  plane = "AXIAL"
+)
+```
+
+### Grid View of All Viewed Slices
+
+```{r, eval=FALSE}
+# Create a grid showing all viewed slices
+summary_stats <- plot_all_slices_with_gaze(
+  nifti_data, 
+  integrated,
+  plane = "AXIAL",
+  max_slices = 25
+)
+
+# The function returns statistics for each slice
+print(summary_stats)
+```
+
+## Analyzing Gaze Patterns
+
+### Gaze Statistics by Slice
+
+```{r, eval=FALSE}
+# Calculate gaze metrics for each slice
+gaze_stats <- analyze_gaze_by_slice(integrated, nifti_data)
+
+# View results
+gaze_stats %>%
+  arrange(desc(n_gazes)) %>%
+  head(10)
+```
+
+### Creating Summary Visualizations
+
+```{r, eval=FALSE}
+# Generate a 4-panel summary plot
+create_gaze_summary_plot(nifti_data, integrated)
+```
+
+This creates:
+1. Timeline showing when each slice was viewed
+2. Overall gaze distribution with density contours
+3. Viewing duration by imaging plane
+4. Most frequently viewed slices
+
+## Interactive Features
+
+### Coordinate Picker
+
+```{r, eval=FALSE}
+# Interactive mode - click on the image to get coordinates
+clicked_points <- safe_coordinate_picker(nifti_data, slice = 20)
+
+# The function returns voxel and world coordinates for each click
+print(clicked_points)
+```
+
+## Creating Animations
+
+Generate frames for an animation showing gaze movement over time:
+
+```{r, eval=FALSE}
+# Create animation frames
+create_gaze_animation(
+  nifti_data, 
+  integrated,
+  output_dir = "gaze_animation"
+)
+
+# Combine frames into video using ffmpeg (command line):
+# ffmpeg -framerate 10 -pattern_type glob -i '*.png' -c:v libx264 gaze_video.mp4
+```
+
+## Coordinate Transformations
+
+The package includes coordinate transformation utilities:
+
+```{r, eval=FALSE}
+# Access the NVImage object
+nvimg <- nifti_data$nvimage
+
+# Convert mm coordinates to voxel indices
+voxel <- nvimg$mm2vox(c(10, -20, 30))
+
+# Convert fractional coordinates (0-1) to mm
+mm <- nvimg$convertFrac2MM(c(0.5, 0.5, 0.5))
+```
+
+## Tips and Best Practices
+
+1. **Data Quality**: Ensure your gaze data has consistent sampling rates
+2. **Latency Correction**: The automatic latency estimation works well, but you can provide manual correction if needed
+3. **Memory Usage**: For large datasets, process in chunks or subsample gaze data
+4. **Visualization**: Adjust `show_density` parameter based on the number of gaze points
+
+## Troubleshooting
+
+### Common Issues
+
+1. **No gaze points matched**: Check timestamp formats and units
+2. **Memory errors**: Use data subsampling or process by time chunks
+3. **Visualization issues**: Ensure slice numbers are within valid range
+
+### Getting Help
+
+- Check function documentation: `?function_name`
+- File issues on GitHub
+- See more examples in the package tests
+
+## Next Steps
+
+- Explore advanced visualization options
+- Export data for statistical analysis
+- Integrate with other neuroimaging packages
+- Create custom analysis pipelines

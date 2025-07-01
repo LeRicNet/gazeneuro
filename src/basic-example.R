@@ -14,6 +14,7 @@ z_axis <- z_axis %>%
 
 # 3. Integrate the data
 integrated <- integrate_all_gaze_points(gaze_data, z_axis)
+integrated$time_sec <- integrated$time_sec.x
 
 # 4. Original visualization
 plot_slice_with_all_gaze(nifti_data, integrated, slice_num = 13)

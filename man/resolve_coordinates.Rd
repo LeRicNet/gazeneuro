@@ -2,21 +2,44 @@
 % Please edit documentation in R/coordinate-mapping.R
 \name{resolve_coordinates}
 \alias{resolve_coordinates}
-\title{Resolve coordinates with device pixel ratio adjustment}
+\title{Resolve coordinates with display frame adjustment}
 \usage{
-resolve_coordinates(x, y, dpr = 1)
+resolve_coordinates(
+  x,
+  y,
+  frame_width = 2624,
+  frame_height = 1640,
+  canvas_width = 1924,
+  canvas_height = 1560,
+  left_border = 350,
+  top_border = 80,
+  dpr = 1.25
+)
 }
 \arguments{
-\item{x}{X coordinate}
+\item{x}{X coordinate from Tobii (0-1 normalized to full display)}
 
-\item{y}{Y coordinate}
+\item{y}{Y coordinate from Tobii (0-1 normalized to full display)}
 
-\item{dpr}{Device pixel ratio (default 1)}
+\item{frame_width}{Full frame width in pixels (default 2624)}
+
+\item{frame_height}{Full frame height in pixels (default 1640)}
+
+\item{canvas_width}{Image canvas width in pixels (default 1924)}
+
+\item{canvas_height}{Image canvas height in pixels (default 1560)}
+
+\item{left_border}{Left border width in pixels (default 350)}
+
+\item{top_border}{Top border height in pixels (default 80)}
+
+\item{dpr}{Device pixel ratio (default 1.25)}
 }
 \value{
-List with adjusted x and y coordinates
+List with adjusted x and y coordinates (0-1 normalized to canvas)
 }
 \description{
-R equivalent of resolveCoordinates() - adjusts coordinates for display.
-In R context, this is mainly for ensuring coordinates are properly scaled.
+Converts Tobii gaze coordinates (0-1 normalized to full display) to
+image canvas coordinates (0-1 normalized to actual image area).
+Handles the frame borders and device pixel ratio.
 }

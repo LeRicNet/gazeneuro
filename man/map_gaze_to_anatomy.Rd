@@ -8,7 +8,8 @@ map_gaze_to_anatomy(
   integrated_data,
   nifti_data,
   row_indices = NULL,
-  include_values = TRUE
+  include_values = TRUE,
+  adjust_coordinates = TRUE
 )
 }
 \arguments{
@@ -19,6 +20,8 @@ map_gaze_to_anatomy(
 \item{row_indices}{Which rows to process (NULL for all)}
 
 \item{include_values}{Whether to extract intensity values at locations}
+
+\item{adjust_coordinates}{Whether to adjust coordinates for display frame (default TRUE)}
 }
 \value{
 Data frame with anatomical locations for each gaze point

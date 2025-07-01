@@ -26,6 +26,13 @@ map_gaze_to_anatomy <- function(integrated_data, nifti_data,
                                 include_values = TRUE,
                                 adjust_coordinates = TRUE) {
 
+  # Validate input
+  required_cols <- c("gaze_x", "gaze_y", "slice_index", "time_sec", "time_aligned", "plane")
+  missing_cols <- setdiff(required_cols, names(integrated_data))
+  if (length(missing_cols) > 0) {
+    stop("Missing required columns in integrated_data: ", paste(missing_cols, collapse = ", "))
+  }
+
   if (is.null(row_indices)) {
     row_indices <- 1:nrow(integrated_data)
   }
@@ -67,7 +74,7 @@ map_gaze_to_anatomy <- function(integrated_data, nifti_data,
 
     # Extract intensity value if requested
     value <- NA
-    if (include_values && in_bounds) {
+    if (include_values && isTRUE(in_bounds)) {
       value <- safe_get_value(img_data, voxel, dims)
     }
 

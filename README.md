@@ -82,6 +82,58 @@ The slice viewing event data should contain:
 - `safe_coordinate_picker()`: Click on slices to get coordinates
 - `safe_quick_view()`: Quick slice viewer with coordinate info
 
+## Coordinate Mapping Functions
+
+### Anatomical Coordinate Conversion
+- `map_gaze_to_anatomy()`: Convert all gaze points to anatomical coordinates
+- `locate_single_point()`: Map a single gaze point (equivalent to JavaScript locate())
+- `batch_locate_gaze()`: Process and summarize gaze locations
+- `get_slice_number()`: Convert normalized slice indices to slice numbers
+
+### Utilities
+- `resolve_coordinates()`: Adjust coordinates for device pixel ratio
+- `safe_get_value()`: Safely extract intensity values from image data
+- `export_anatomical_locations()`: Export locations as CSV, JSON, or NIfTI heatmap
+
+## Coordinate Mapping Example
+
+The package now includes functions to map gaze coordinates to anatomical locations in neuroimaging space:
+
+```r
+# Map gaze points to anatomical coordinates
+anatomical_locations <- map_gaze_to_anatomy(integrated, nifti_data)
+
+# Find most-viewed brain regions
+most_viewed <- batch_locate_gaze(integrated, nifti_data, summarize = TRUE)
+
+# Map a single point (like JavaScript locate())
+location <- locate_single_point(
+  x = 0.5,  # gaze x (0-1)
+  y = 0.5,  # gaze y (0-1)
+  z = 0.5,  # slice position (0-1)
+  nifti_data = nifti_data
+)
+
+# Access coordinates
+print(location$mm)   # World coordinates in mm
+print(location$vox)  # Voxel indices
+print(location$values[[1]]$value)  # Intensity value
+
+# Export as NIfTI heatmap
+export_anatomical_locations(
+  anatomical_locations, 
+  "gaze_heatmap.nii.gz",
+  format = "nifti",
+  nifti_template = nifti_data
+)
+```
+
+This allows you to:
+- Track which brain regions participants focused on
+- Create heatmaps of gaze density in anatomical space
+- Export data for analysis in other neuroimaging tools
+- Integrate eye tracking with brain imaging analysis pipelines
+
 ## Example Workflow
 
 ```r

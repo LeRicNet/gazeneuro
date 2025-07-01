@@ -1,0 +1,281 @@
+---
+title: "Coordinate Mapping in gazeneuro"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{Coordinate Mapping in gazeneuro}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r, include = FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>"
+)
+```
+
+```{r setup}
+library(gazeneuro)
+library(tidyverse)
+```
+
+## Overview
+
+The coordinate mapping functionality in `gazeneuro` allows you to convert gaze tracking coordinates to anatomical locations in neuroimaging space. This is essential for understanding which brain regions participants were looking at during image viewing.
+
+## Coordinate Systems
+
+The package handles three coordinate systems:
+
+1. **Fractional coordinates (0-1)**: Normalized coordinates from gaze tracking
+2. **Voxel coordinates**: Integer indices into the 3D image array
+3. **World/MM coordinates**: Physical locations in millimeters
+
+## Basic Usage
+
+### Single Point Mapping
+
+To map a single gaze point to anatomical coordinates:
+
+```{r, eval=FALSE}
+# Load your data
+nifti_data <- preload_nifti_data("brain.nii.gz")
+
+# Map a single point at the center of the display
+location <- locate_single_point(
+  x = 0.5,      # Center X (0-1)
+  y = 0.5,      # Center Y (0-1)
+  z = 0.5,      # Middle slice (0-1)
+  nifti_data = nifti_data,
+  plane = "AXIAL"
+)
+
+# Access the coordinates
+print(location$mm)   # World coordinates in mm
+print(location$vox)  # Voxel indices
+print(location$values[[1]]$value)  # Intensity value
+```
+
+### Batch Processing
+
+For processing all gaze points from an eye tracking session:
+
+```{r, eval=FALSE}
+# Integrate gaze and slice data
+integrated <- integrate_all_gaze_points(gaze_data, z_axis_data)
+
+# Map all points to anatomical locations
+locations <- map_gaze_to_anatomy(integrated, nifti_data)
+
+# View the first few rows
+head(locations)
+```
+
+## Analyzing Gaze Patterns in Anatomical Space
+
+### Find Most-Viewed Voxels
+
+```{r, eval=FALSE}
+# Get summary by unique voxel locations
+voxel_summary <- batch_locate_gaze(
+  integrated, 
+  nifti_data, 
+  summarize = TRUE
+)
+
+# Top 10 most viewed voxels
+top_voxels <- voxel_summary %>%
+  arrange(desc(n_gazes)) %>%
+  head(10)
+
+print(top_voxels)
+```
+
+### Visualize Anatomical Locations
+
+```{r, eval=FALSE}
+# Create visualization of coordinate mappings
+plot_coordinate_mapping(locations, nifti_data)
+```
+
+## Working with Different Imaging Planes
+
+The coordinate mapping works across all three standard imaging planes:
+
+```{r, eval=FALSE}
+# Process SAGITTAL plane
+sagittal_gazes <- integrated %>%
+  filter(plane == "SAGITTAL")
+
+sagittal_locations <- map_gaze_to_anatomy(
+  sagittal_gazes, 
+  nifti_data
+)
+
+# Process CORONAL plane
+coronal_gazes <- integrated %>%
+  filter(plane == "CORONAL")
+
+coronal_locations <- map_gaze_to_anatomy(
+  coronal_gazes, 
+  nifti_data
+)
+```
+
+## Extracting Regional Statistics
+
+### By Anatomical Region
+
+If you have a brain atlas, you can aggregate gaze statistics by region:
+
+```{r, eval=FALSE}
+# Assuming you have an atlas aligned to your image
+atlas_data <- preload_nifti_data("atlas.nii.gz")
+
+# Get atlas labels for each gaze location
+locations_with_regions <- locations %>%
+  mutate(
+    # Get region ID from atlas
+    region_id = sapply(1:n(), function(i) {
+      safe_get_value(
+        atlas_data$data, 
+        c(vox_x[i], vox_y[i], vox_z[i]),
+        atlas_data$dims
+      )
+    })
+  )
+
+# Summarize by region
+regional_summary <- locations_with_regions %>%
+  filter(!is.na(region_id), region_id > 0) %>%
+  group_by(region_id) %>%
+  summarise(
+    n_gazes = n(),
+    total_duration = max(time_sec) - min(time_sec),
+    mean_intensity = mean(intensity, na.rm = TRUE)
+  )
+```
+
+### Heatmap Generation
+
+Create a 3D heatmap of gaze density:
+
+```{r, eval=FALSE}
+# Initialize empty heatmap
+heatmap_3d <- array(0, dim = nifti_data$dims)
+
+# Accumulate gaze counts
+for (i in 1:nrow(locations)) {
+  vox <- c(locations$vox_x[i], locations$vox_y[i], locations$vox_z[i])
+  
+  # Check bounds
+  if (all(vox >= 0) && all(vox < nifti_data$dims)) {
+    heatmap_3d[vox[1]+1, vox[2]+1, vox[3]+1] <- 
+      heatmap_3d[vox[1]+1, vox[2]+1, vox[3]+1] + 1
+  }
+}
+
+# Smooth the heatmap (optional)
+# heatmap_3d <- smooth_3d(heatmap_3d)
+
+# Save as NIfTI
+# write_nifti(heatmap_3d, "gaze_heatmap.nii.gz")
+```
+
+## Advanced Usage
+
+### Custom Coordinate Transformations
+
+For specialized analyses, you can work directly with the coordinate transformation functions:
+
+```{r, eval=FALSE}
+# Get the NVImage object
+nvimg <- nifti_data$nvimage
+
+# Custom fractional coordinate
+frac_coord <- c(0.75, 0.25, 0.5)
+
+# Convert to mm
+mm_coord <- nvimg$convertFrac2MM(frac_coord)
+print(paste("MM coordinates:", paste(mm_coord[1:3], collapse=", ")))
+
+# Convert to voxel
+vox_coord <- nvimg$mm2vox(mm_coord[1:3])
+print(paste("Voxel indices:", paste(vox_coord, collapse=", ")))
+```
+
+### Time-Based Analysis
+
+Analyze how gaze patterns change over time:
+
+```{r, eval=FALSE}
+# Divide session into time bins
+locations_with_bins <- locations %>%
+  mutate(
+    time_bin = cut(time_sec, breaks = 10, labels = FALSE)
+  )
+
+# Analyze spatial spread over time
+time_analysis <- locations_with_bins %>%
+  group_by(time_bin) %>%
+  summarise(
+    n_gazes = n(),
+    spatial_spread_mm = sqrt(var(mm_x) + var(mm_y) + var(mm_z)),
+    mean_x_mm = mean(mm_x),
+    mean_y_mm = mean(mm_y),
+    mean_z_mm = mean(mm_z)
+  )
+
+# Plot spatial spread over time
+ggplot(time_analysis, aes(x = time_bin, y = spatial_spread_mm)) +
+  geom_line() +
+  geom_point() +
+  labs(x = "Time Bin", y = "Spatial Spread (mm)",
+       title = "Gaze Pattern Dispersion Over Time")
+```
+
+## Performance Considerations
+
+For large datasets:
+
+1. **Process in chunks**: Don't load all gaze data at once
+2. **Use parallel processing**: For batch operations
+3. **Pre-filter data**: Remove invalid gaze points before mapping
+
+```{r, eval=FALSE}
+# Example of chunk processing
+chunk_size <- 10000
+n_chunks <- ceiling(nrow(integrated) / chunk_size)
+
+all_locations <- list()
+
+for (i in 1:n_chunks) {
+  start_idx <- (i - 1) * chunk_size + 1
+  end_idx <- min(i * chunk_size, nrow(integrated))
+  
+  chunk_locations <- map_gaze_to_anatomy(
+    integrated[start_idx:end_idx, ],
+    nifti_data
+  )
+  
+  all_locations[[i]] <- chunk_locations
+}
+
+# Combine results
+final_locations <- do.call(rbind, all_locations)
+```
+
+## Integration with Other Packages
+
+The coordinate mapping output can be used with other neuroimaging packages:
+
+```{r, eval=FALSE}
+# Export for use with FSL or SPM
+write.csv(locations, "gaze_coordinates.csv", row.names = FALSE)
+
+# Create a point cloud for visualization
+library(rgl)
+plot3d(locations$mm_x, locations$mm_y, locations$mm_z,
+       col = heat.colors(100)[cut(locations$intensity, 100)],
+       size = 3)
+```

@@ -20,11 +20,19 @@ plot_slice_with_all_gaze(nifti_data, integrated, slice_num = 13)
 
 # 5. NEW: Map gaze points to anatomical coordinates
 cat("\n=== Coordinate Mapping ===\n")
+# Note: adjust_coordinates=TRUE by default to handle display frame
 anatomical_locations <- map_gaze_to_anatomy(integrated, nifti_data)
 
-# Show first few anatomical locations
-cat("\nFirst 5 gaze points in anatomical space:\n")
+# Check how many points are within the image canvas
+in_canvas_count <- sum(anatomical_locations$in_canvas)
+cat(sprintf("Gaze points in image canvas: %d of %d (%.1f%%)\n",
+            in_canvas_count, nrow(anatomical_locations),
+            100 * in_canvas_count / nrow(anatomical_locations)))
+
+# Show first few anatomical locations (only in-canvas points)
+cat("\nFirst 5 in-canvas gaze points in anatomical space:\n")
 anatomical_locations %>%
+  filter(in_canvas) %>%
   select(time_sec, gaze_x, gaze_y, mm_x, mm_y, mm_z, vox_x, vox_y, vox_z, intensity) %>%
   head(5) %>%
   print()

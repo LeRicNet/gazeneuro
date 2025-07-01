@@ -97,12 +97,34 @@ test_that("batch coordinate mapping works", {
   expect_true(nrow(summary) <= nrow(locations))
 })
 
-test_that("resolve_coordinates works", {
-  coords <- resolve_coordinates(100, 200, dpr = 2)
-  expect_equal(coords$x, 200)
-  expect_equal(coords$y, 400)
+test_that("resolve_coordinates works with display frame", {
+  # Test center point
+  coords <- resolve_coordinates(0.5, 0.5)
+  expect_true(coords$in_bounds)
+  # Center of frame should map near center of canvas
+  expect_gt(coords$x, 0.4)
+  expect_lt(coords$x, 0.6)
 
-  coords_default <- resolve_coordinates(100, 200)
-  expect_equal(coords_default$x, 100)
-  expect_equal(coords_default$y, 200)
+  # Test top-left corner (should be out of bounds)
+  coords_tl <- resolve_coordinates(0, 0)
+  expect_false(coords_tl$in_bounds)
+
+  # Test bottom-right corner
+  coords_br <- resolve_coordinates(1, 1)
+  expect_false(coords_br$in_bounds)  # Right border cuts off
+
+  # Test exact canvas boundaries
+  # Left edge of canvas: 350/2624 ≈ 0.1334
+  left_edge <- 350 / 2624
+  coords_left <- resolve_coordinates(left_edge, 0.5)
+  expect_equal(coords_left$x, 0, tolerance = 0.001)
+
+  # Right edge of canvas: (350+1924)/2624 ≈ 0.8668
+  right_edge <- (350 + 1924) / 2624
+  coords_right <- resolve_coordinates(right_edge, 0.5)
+  expect_equal(coords_right$x, 1, tolerance = 0.001)
+
+  # Test with default DPR
+  coords_default <- resolve_coordinates(0.5, 0.5)
+  expect_equal(coords_default$x, coords$x)  # Should be same with DPR 1.25
 })

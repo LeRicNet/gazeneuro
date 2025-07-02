@@ -420,7 +420,9 @@ visualize_display_frame <- function(show_example_points = TRUE) {
   canvas_width <- 1924
   canvas_height <- 1560
   left_border <- 350
-  top_border <- 80
+  right_border <- 350
+  bottom_border <- 0  # Canvas aligned to bottom
+  top_border <- frame_height - canvas_height - bottom_border  # 80
   dpr <- 1.25
 
   # Set up plot
@@ -437,10 +439,10 @@ visualize_display_frame <- function(show_example_points = TRUE) {
   rect(0, 0, frame_width, frame_height,
        border = "black", lwd = 2)
 
-  # Draw canvas
-  rect(left_border, top_border,
+  # Draw canvas (aligned to bottom)
+  rect(left_border, bottom_border,
        left_border + canvas_width,
-       top_border + canvas_height,
+       bottom_border + canvas_height,
        border = "blue", lwd = 2, lty = 2)
 
   # Add labels
@@ -448,7 +450,7 @@ visualize_display_frame <- function(show_example_points = TRUE) {
        sprintf("Full Frame: %d x %d px", frame_width, frame_height),
        cex = 1.2)
 
-  text(left_border + canvas_width/2, top_border + canvas_height/2,
+  text(left_border + canvas_width/2, bottom_border + canvas_height/2,
        sprintf("Image Canvas: %d x %d px", canvas_width, canvas_height),
        cex = 1.2, col = "blue")
 
@@ -457,17 +459,17 @@ visualize_display_frame <- function(show_example_points = TRUE) {
        sprintf("Left: %dpx", left_border),
        srt = 90, cex = 0.8)
 
-  text(frame_width - left_border/2, frame_height/2,
-       sprintf("Right: %dpx", left_border),
+  text(frame_width - right_border/2, frame_height/2,
+       sprintf("Right: %dpx", right_border),
        srt = 90, cex = 0.8)
 
-  text(frame_width/2, top_border/2,
+  text(frame_width/2, frame_height - top_border/2,
        sprintf("Top: %dpx", top_border),
        cex = 0.8)
 
-  text(frame_width/2, frame_height - (frame_height - top_border - canvas_height)/2,
-       sprintf("Bottom: %dpx", frame_height - top_border - canvas_height),
-       cex = 0.8)
+  text(frame_width/2, bottom_border + 20,
+       "Canvas aligned to bottom (0px)",
+       cex = 0.8, col = "blue")
 
   if (show_example_points) {
     # Example gaze points in Tobii coordinates
@@ -485,7 +487,7 @@ visualize_display_frame <- function(show_example_points = TRUE) {
       # Adjusted position
       adj <- resolve_coordinates(example_points$x[i], example_points$y[i])
       adj_x <- left_border + adj$x * canvas_width
-      adj_y <- top_border + adj$y * canvas_height
+      adj_y <- bottom_border + adj$y * canvas_height
 
       # Plot original
       points(orig_x, orig_y, pch = 19, col = "red", cex = 1.5)
@@ -499,15 +501,17 @@ visualize_display_frame <- function(show_example_points = TRUE) {
       }
 
       # Label
-      text(orig_x, orig_y - 30, example_points$label[i],
+      text(orig_x, orig_y + 30, example_points$label[i],
            cex = 0.8, col = "red")
     }
 
-    legend("bottomright",
+    # Legend in top-left corner to avoid blocking
+    legend("topleft",
            legend = c("Tobii coordinates", "Canvas coordinates", "Out of bounds"),
            pch = c(19, 19, 19),
            col = c("red", "green", "gray"),
-           cex = 0.8)
+           cex = 0.8,
+           bg = "white")
   }
 
   # Add DPR note

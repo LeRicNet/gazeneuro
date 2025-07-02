@@ -104,6 +104,8 @@ test_that("resolve_coordinates works with display frame", {
   # Center of frame should map near center of canvas
   expect_gt(coords$x, 0.4)
   expect_lt(coords$x, 0.6)
+  expect_gt(coords$y, 0.4)
+  expect_lt(coords$y, 0.6)
 
   # Test top-left corner (should be out of bounds)
   coords_tl <- resolve_coordinates(0, 0)
@@ -123,6 +125,16 @@ test_that("resolve_coordinates works with display frame", {
   right_edge <- (350 + 1924) / 2624
   coords_right <- resolve_coordinates(right_edge, 0.5)
   expect_equal(coords_right$x, 1, tolerance = 0.001)
+
+  # Top edge of canvas: 80/1640 ≈ 0.0488
+  top_edge <- 80 / 1640
+  coords_top <- resolve_coordinates(0.5, top_edge)
+  expect_equal(coords_top$y, 0, tolerance = 0.001)
+
+  # Bottom edge of canvas: canvas extends to bottom (y=1)
+  coords_bottom <- resolve_coordinates(0.5, 1.0)
+  expect_equal(coords_bottom$y, 1, tolerance = 0.001)
+  expect_true(coords_bottom$in_bounds)
 
   # Test with default DPR
   coords_default <- resolve_coordinates(0.5, 0.5)

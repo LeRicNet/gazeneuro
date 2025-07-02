@@ -91,9 +91,13 @@ The slice viewing event data should contain:
 - `get_slice_number()`: Convert normalized slice indices to slice numbers
 
 ### Utilities
-- `resolve_coordinates()`: Adjust coordinates for device pixel ratio
+- `resolve_coordinates()`: Adjust coordinates for device pixel ratio and display frame
 - `safe_get_value()`: Safely extract intensity values from image data
 - `export_anatomical_locations()`: Export locations as CSV, JSON, or NIfTI heatmap
+
+### Display Frame Handling
+- `visualize_display_frame()`: Visualize the display layout
+- `plot_slice_with_validity()`: Show valid vs out-of-bounds gaze points
 
 ## Coordinate Mapping Example
 
@@ -128,8 +132,23 @@ export_anatomical_locations(
 )
 ```
 
+### Display Frame Configuration
+
+The package handles a specific display setup where the image canvas (1924×1560) is positioned within a larger frame (2624×1640):
+
+```r
+# Visualize the display layout
+visualize_display_frame()
+
+# Check which gazes fall within the image canvas
+plot_slice_with_validity(nifti_data, integrated, slice_num = 12)
+```
+
+**Important**: When plotting gaze data, the package handles Y-axis inversion between Tobii coordinates (Y=0 at top) and plot coordinates (Y=0 at bottom) automatically.
+
 This allows you to:
 - Track which brain regions participants focused on
+- Filter out gazes that fall on screen borders
 - Create heatmaps of gaze density in anatomical space
 - Export data for analysis in other neuroimaging tools
 - Integrate eye tracking with brain imaging analysis pipelines

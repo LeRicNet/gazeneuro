@@ -9,7 +9,8 @@ cat("=== Display Frame Layout ===\n")
 cat("Full frame: 2624 x 1640 pixels\n")
 cat("Image canvas: 1924 x 1560 pixels\n")
 cat("Left/Right borders: 350 pixels each\n")
-cat("Top border: 80 pixels (canvas aligned to bottom)\n")
+cat("Top border: 80 pixels\n")
+cat("Bottom border: 0 pixels (canvas aligned to bottom)\n")
 cat("Device Pixel Ratio: 1.25\n\n")
 
 # Show the visual layout
@@ -27,7 +28,7 @@ test_points <- data.frame(
     "Bottom-right of canvas (approximate)"
   ),
   tobii_x = c(0.5, 0.0, 0.133, 0.5, 0.867),
-  tobii_y = c(0.5, 0.0, 0.049, 0.5, 0.951)
+  tobii_y = c(0.5, 0.0, 0.049, 0.5, 1.0)
 )
 
 for (i in 1:nrow(test_points)) {

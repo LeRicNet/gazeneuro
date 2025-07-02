@@ -9,28 +9,52 @@ Full Display Frame: 2624 x 1640 pixels
 ├── Left Border: 350 pixels
 ├── Image Canvas: 1924 x 1560 pixels  
 ├── Right Border: 350 pixels
+├── Top Border: 80 pixels
 └── Bottom Border: 0 pixels (canvas aligned to bottom)
-    Top Border: 80 pixels
 
 Device Pixel Ratio (DPR): 1.25
 ```
+
+The canvas is **aligned to the bottom** of the display frame.
 
 ## Coordinate Systems
 
 ### 1. Tobii Coordinates (Input)
 - **Range**: 0-1 normalized to the full display frame (2624 x 1640)
-- **Origin**: Top-left of the display
+- **Origin**: Top-left of the display (Y=0 at top, Y=1 at bottom)
 - **What it represents**: Where the user is looking on the entire screen
 
 ### 2. Canvas Coordinates (Intermediate)
 - **Range**: 0-1 normalized to the image canvas (1924 x 1560)
-- **Origin**: Top-left of the canvas area
+- **Origin**: Top-left of the canvas area (Y=0 at top, Y=1 at bottom)
 - **What it represents**: Where the user is looking within the actual image area
 
-### 3. Anatomical Coordinates (Output)
+### 3. Plot Coordinates (Display)
+- **Range**: 0-1 in plot space
+- **Origin**: Bottom-left (Y=0 at bottom, Y=1 at top) - standard R plot orientation
+- **Conversion**: `plot_y = 1 - tobii_y` or `plot_y = 1 - canvas_y`
+
+### 4. Anatomical Coordinates (Output)
 - **Voxel coordinates**: Integer indices into the 3D image array
 - **MM coordinates**: Physical location in millimeters
 - **What it represents**: The anatomical location being viewed
+
+## Important: Y-Axis Inversion
+
+When plotting gaze data on brain slices, you must invert the Y coordinate:
+
+```r
+# Tobii/Canvas Y: 0=top, 1=bottom
+# Plot Y: 0=bottom, 1=top
+
+# Always invert Y for plotting:
+plot_y <- 1 - tobii_y
+```
+
+This ensures that:
+- Top-left gazes appear in the top-left of the plot
+- Bottom-right gazes appear in the bottom-right of the plot
+- The canvas boundaries are correctly oriented
 
 ## Coordinate Transformation
 
@@ -50,10 +74,11 @@ adjusted <- resolve_coordinates(tobii_x, tobii_y)
 
 | Location | Tobii X | Tobii Y | Canvas X | Canvas Y | In Bounds |
 |----------|---------|---------|----------|----------|-----------|
-| Display center | 0.500 | 0.500 | 0.500 | 0.476 | ✓ |
+| Display center | 0.500 | 0.500 | 0.500 | 0.474 | ✓ |
 | Canvas top-left | 0.133 | 0.049 | 0.000 | 0.000 | ✓ |
-| Canvas bottom-right | 0.867 | 0.951 | 1.000 | 1.000 | ✓ |
+| Canvas bottom-right | 0.867 | 1.000 | 1.000 | 1.000 | ✓ |
 | Display top-left | 0.000 | 0.000 | -0.182 | -0.051 | ✗ |
+| Display bottom-left | 0.000 | 1.000 | -0.182 | 1.026 | ✗ |
 
 ## Usage in the Package
 

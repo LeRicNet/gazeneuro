@@ -412,7 +412,7 @@ plot_coordinate_mapping <- function(locations, nifti_data) {
 #'
 #' @param show_example_points Whether to show example gaze points
 #' @export
-#' @importFrom graphics rect text points legend
+#' @importFrom graphics rect text points legend arrows
 visualize_display_frame <- function(show_example_points = TRUE) {
   # Display parameters
   frame_width <- 2624
@@ -439,7 +439,7 @@ visualize_display_frame <- function(show_example_points = TRUE) {
   rect(0, 0, frame_width, frame_height,
        border = "black", lwd = 2)
 
-  # Draw canvas (aligned to bottom)
+  # Draw canvas (aligned to bottom in plot coordinates)
   rect(left_border, bottom_border,
        left_border + canvas_width,
        bottom_border + canvas_height,
@@ -481,13 +481,15 @@ visualize_display_frame <- function(show_example_points = TRUE) {
 
     for (i in 1:nrow(example_points)) {
       # Original position (Tobii coordinates)
+      # Note: Flip Y coordinate to convert from Tobii (top=0) to plot (bottom=0)
       orig_x <- example_points$x[i] * frame_width
-      orig_y <- example_points$y[i] * frame_height
+      orig_y <- (1 - example_points$y[i]) * frame_height  # FLIP Y HERE
 
       # Adjusted position
       adj <- resolve_coordinates(example_points$x[i], example_points$y[i])
       adj_x <- left_border + adj$x * canvas_width
-      adj_y <- bottom_border + adj$y * canvas_height
+      # Also flip the adjusted Y coordinate
+      adj_y <- bottom_border + (1 - adj$y) * canvas_height  # FLIP Y HERE
 
       # Plot original
       points(orig_x, orig_y, pch = 19, col = "red", cex = 1.5)

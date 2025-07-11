@@ -1,86 +1,3 @@
-#' Plot NIfTI slice with synchronized gaze data
-#'
-#' @description
-#' Displays a NIfTI slice overlaid with gaze tracking data that was
-#' recorded while viewing that slice.
-#'
-#' @param nifti_data List from preload_nifti_data()
-#' @param integrated_data Data frame from integrate_all_gaze_points()
-#' @param slice_num Slice number to display
-#' @param plane Imaging plane (AXIAL, SAGITTAL, or CORONAL)
-#' @param show_density Whether to show density contours for many points
-#'
-#' @return Data frame of gaze points for the displayed slice
-#' @export
-#' @importFrom graphics image points lines legend abline text contour
-#' @importFrom MASS kde2d
-plot_slice_with_all_gaze <- function(nifti_data, integrated_data,
-                                     slice_num = 12, plane = "AXIAL",
-                                     show_density = TRUE) {
-
-  # Get all gaze points for this slice
-  gaze_points <- get_all_gaze_for_slice(integrated_data, slice_num, plane,
-                                        dims = dim(nifti_data$data))
-
-  message(sprintf("\nSlice %d: %d gaze points over %.1f seconds",
-                  slice_num, nrow(gaze_points),
-                  ifelse(nrow(gaze_points) > 0,
-                         max(gaze_points$time_aligned) - min(gaze_points$time_aligned),
-                         0)))
-
-  # Get slice data
-  if (plane == "AXIAL") {
-    slice_data <- nifti_data$data[,, slice_num]
-  } else if (plane == "SAGITTAL") {
-    slice_data <- nifti_data$data[slice_num, , ]
-  } else {
-    slice_data <- nifti_data$data[, slice_num, ]
-  }
-
-  # Create plot
-  par(mar = c(4, 4, 3, 2))
-
-  # Base image
-  image(slice_data, col = gray((0:255)/255),
-        main = sprintf("%s Slice %d - %d gaze points",
-                       plane, slice_num, nrow(gaze_points)))
-
-  if (nrow(gaze_points) > 0) {
-    if (show_density && nrow(gaze_points) > 50) {
-      # Create density overlay
-      kde <- MASS::kde2d(gaze_points$gaze_x, gaze_points$gaze_y,
-                         n = 50, lims = c(0, 1, 0, 1))
-      contour(kde, add = TRUE, col = heat.colors(10), lwd = 2)
-    } else {
-      # Plot individual points
-      points(gaze_points$gaze_x, gaze_points$gaze_y,
-             col = rgb(1, 0, 0, 0.1), pch = 19, cex = 0.5)
-    }
-
-    # Show temporal progression with color
-    n_points <- nrow(gaze_points)
-    if (n_points > 1 && n_points < 500) {
-      colors <- colorRampPalette(c("green", "yellow", "red"))(n_points)
-      points(gaze_points$gaze_x, gaze_points$gaze_y,
-             col = colors, pch = 19, cex = 0.7)
-    }
-
-    # Add mean position
-    mean_x <- mean(gaze_points$gaze_x)
-    mean_y <- mean(gaze_points$gaze_y)
-    points(mean_x, mean_y, col = "blue", pch = 3, cex = 2, lwd = 3)
-
-    # Add stats to plot
-    text(0.05, 0.95, sprintf("n = %d", nrow(gaze_points)),
-         adj = c(0, 1), cex = 0.8)
-    text(0.05, 0.90, sprintf("%.1f sec",
-                             max(gaze_points$time_aligned) - min(gaze_points$time_aligned)),
-         adj = c(0, 1), cex = 0.8)
-  }
-
-  return(invisible(gaze_points))
-}
-
 #' Plot NIfTI slice with synchronized gaze data - IMAGE TRANSFORMATION
 #'
 #' @description
@@ -393,6 +310,166 @@ visualize_image_bounds <- function(integrated_data, image_bounds = NULL,
          lty = c(NA, 1, 1),
          lwd = c(NA, 3, 1),
          cex = 0.8)
+}
+#' Plot all viewed slices in a grid with gaze data
+#'
+#' @description
+#' Creates a grid visualization showing all slices that were viewed,
+#' each overlaid with its corresponding gaze data.
+#'
+#' @param nifti_data List from preload_nifti_data()
+#' @param integrated_data Data frame from integrate_all_gaze_points()
+#' @param plane Imaging plane to display
+#' @param max_slices Maximum number of slices to display
+#' @param ncol Number of columns in grid (NULL for auto)
+#'
+#' @return Data frame with summary statistics per slice
+#' @export
+#' @importFrom graphics par image points lines box mtext
+#' @importFrom dplyr filter mutate pull unique case_when
+plot_all_slices_with_gaze <- function(nifti_data, integrated_data,
+                                      plane = "AXIAL",
+                                      max_slices = 25,
+                                      ncol = NULL) {
+
+  # Get unique slices that were viewed
+  viewed_slices <- integrated_data %>%
+    filter(plane == !!plane) %>%
+    mutate(
+      # Convert normalized index to slice number
+      slice_num = case_when(
+        plane == "AXIAL" ~ round(slice_index * (nifti_data$nvimage$dimsRAS[4] - 1)) + 1,
+        plane == "SAGITTAL" ~ round(slice_index * (nifti_data$nvimage$dimsRAS[2] - 1)) + 1,
+        plane == "CORONAL" ~ round(slice_index * (nifti_data$nvimage$dimsRAS[3] - 1)) + 1,
+        TRUE ~ NA_real_
+      )
+    ) %>%
+    filter(!is.na(slice_num)) %>%
+    pull(slice_num) %>%
+    unique() %>%
+    sort()
+
+  n_slices <- length(viewed_slices)
+  message(sprintf("\nFound %d %s slices with gaze data", n_slices, plane))
+
+  if (n_slices == 0) {
+    message("No slices found for this plane")
+    return(invisible(NULL))
+  }
+
+  # Limit number of slices if requested
+  if (n_slices > max_slices) {
+    message(sprintf("Limiting to first %d slices", max_slices))
+    viewed_slices <- viewed_slices[1:max_slices]
+    n_slices <- max_slices
+  }
+
+  # Calculate grid dimensions
+  if (is.null(ncol)) {
+    ncol <- ceiling(sqrt(n_slices))
+  }
+  nrow <- ceiling(n_slices / ncol)
+
+  # Set up the plotting grid
+  par(mfrow = c(nrow, ncol), mar = c(1, 1, 2, 1), oma = c(2, 2, 4, 2))
+
+  # Plot each slice
+  for (i in 1:n_slices) {
+    slice_num <- viewed_slices[i]
+
+    # Get slice data
+    if (plane == "AXIAL") {
+      slice_data <- nifti_data$data[,, slice_num]
+    } else if (plane == "SAGITTAL") {
+      slice_data <- nifti_data$data[slice_num, , ]
+    } else if (plane == "CORONAL") {
+      slice_data <- nifti_data$data[, slice_num, ]
+    }
+
+    # Get gaze points for this slice
+    slice_normalized <- (slice_num - 1) / (nifti_data$nvimage$dimsRAS[
+      ifelse(plane == "AXIAL", 4, ifelse(plane == "SAGITTAL", 2, 3))
+    ] - 1)
+
+    gaze_points <- integrated_data %>%
+      filter(
+        plane == !!plane,
+        abs(slice_index - slice_normalized) < 0.02
+      )
+
+    # Plot the slice
+    image(slice_data,
+          col = gray((0:255)/255),
+          axes = FALSE,
+          main = sprintf("Slice %d (n=%d)", slice_num, nrow(gaze_points)),
+          cex.main = 0.8)
+
+    # Add gaze points if any
+    if (nrow(gaze_points) > 0) {
+      # Add all gaze points
+      points(gaze_points$gaze_x,
+             gaze_points$gaze_y,
+             col = rgb(1, 0, 0, 0.4),
+             pch = 19,
+             cex = 0.3)
+
+      # Add trajectory lines if more than 5 points
+      if (nrow(gaze_points) > 5) {
+        lines(gaze_points$gaze_x,
+              gaze_points$gaze_y,
+              col = rgb(1, 0, 0, 0.2),
+              lwd = 1)
+      }
+
+      # Mark center of gaze
+      mean_x <- mean(gaze_points$gaze_x)
+      mean_y <- mean(gaze_points$gaze_y)
+      points(mean_x, mean_y,
+             col = "blue", pch = 3, cex = 1, lwd = 2)
+    }
+
+    # Add slice border
+    box()
+  }
+
+  # Add empty plots if needed to fill grid
+  if (n_slices < nrow * ncol) {
+    for (i in (n_slices + 1):(nrow * ncol)) {
+      plot.new()
+    }
+  }
+
+  # Add overall title
+  mtext(sprintf("%s Slices with Gaze Overlay", plane),
+        outer = TRUE, cex = 1.2, line = 2)
+  mtext(sprintf("Red: gaze points, Blue cross: mean gaze position"),
+        outer = TRUE, cex = 0.8, line = 0.5)
+
+  # Reset par
+  par(mfrow = c(1, 1), mar = c(5.1, 4.1, 4.1, 2.1), oma = c(0, 0, 0, 0))
+
+  # Return summary statistics
+  summary_stats <- integrated_data %>%
+    filter(plane == !!plane) %>%
+    mutate(
+      slice_num = case_when(
+        plane == "AXIAL" ~ round(slice_index * (nifti_data$nvimage$dimsRAS[4] - 1)) + 1,
+        plane == "SAGITTAL" ~ round(slice_index * (nifti_data$nvimage$dimsRAS[2] - 1)) + 1,
+        plane == "CORONAL" ~ round(slice_index * (nifti_data$nvimage$dimsRAS[3] - 1)) + 1
+      )
+    ) %>%
+    group_by(slice_num) %>%
+    summarise(
+      n_gazes = n(),
+      duration = max(time_sec) - min(time_sec),
+      mean_x = mean(gaze_x),
+      mean_y = mean(gaze_y),
+      sd_x = sd(gaze_x),
+      sd_y = sd(gaze_y),
+      .groups = "drop"
+    )
+
+  return(invisible(summary_stats))
 }
 
 #' Create gaze animation frames

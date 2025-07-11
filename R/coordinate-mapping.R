@@ -21,112 +21,112 @@
 #' # Map only specific rows
 #' locations <- map_gaze_to_anatomy(integrated, nifti_data, row_indices = 1:100)
 #' }
-map_gaze_to_anatomy <- function(integrated_data, nifti_data,
-                                row_indices = NULL,
-                                include_values = TRUE,
-                                adjust_coordinates = TRUE) {
-
-  # Validate input
-  required_cols <- c("gaze_x", "gaze_y", "slice_index", "time_sec", "time_aligned", "plane")
-  missing_cols <- setdiff(required_cols, names(integrated_data))
-  if (length(missing_cols) > 0) {
-    stop("Missing required columns in integrated_data: ", paste(missing_cols, collapse = ", "))
-  }
-
-  if (is.null(row_indices)) {
-    row_indices <- 1:nrow(integrated_data)
-  }
-
-  # Get NVImage object
-  nvimg <- nifti_data$nvimage
-  img_data <- nifti_data$data
-  dims <- nifti_data$dims
-
-  # Process each gaze point
-  locations <- lapply(row_indices, function(i) {
-    row <- integrated_data[i, ]
-
-    # Adjust coordinates if needed (for display frame)
-    if (adjust_coordinates) {
-      adjusted <- resolve_coordinates(row$gaze_x, row$gaze_y)
-      gaze_x_adj <- adjusted$x
-      gaze_y_adj <- adjusted$y
-      in_bounds <- adjusted$in_bounds
-    } else {
-      gaze_x_adj <- row$gaze_x
-      gaze_y_adj <- row$gaze_y
-      in_bounds <- TRUE
-    }
-
-    # Create fractional coordinates
-    frac <- c(gaze_x_adj, gaze_y_adj, row$slice_index)
-
-    # Convert to mm coordinates
-    mm_coords <- nvimg$convertFrac2MM(frac, isForceSliceMM = TRUE)
-    mm <- mm_coords[1:3]
-
-    # Convert to voxel coordinates
-    voxel <- nvimg$mm2vox(mm, frac = FALSE)
-    voxel_frac <- nvimg$mm2vox(mm, frac = TRUE)
-
-    # Get actual slice number based on plane
-    slice_num <- get_slice_number(row$slice_index, row$plane, dims)
-
-    # Extract intensity value if requested
-    value <- NA
-    if (include_values && isTRUE(in_bounds)) {
-      value <- safe_get_value(img_data, voxel, dims)
-    }
-
-    # Create location record
-    list(
-      # Original gaze data
-      gaze_id = row$gaze_id,
-      time_sec = row$time_sec,
-      time_aligned = row$time_aligned,
-
-      # Original coordinates (Tobii frame)
-      gaze_x_original = row$gaze_x,
-      gaze_y_original = row$gaze_y,
-
-      # Adjusted coordinates (canvas)
-      gaze_x = gaze_x_adj,
-      gaze_y = gaze_y_adj,
-      in_canvas = in_bounds,
-
-      slice_index = row$slice_index,
-
-      # Fractional coordinates (0-1)
-      frac_x = frac[1],
-      frac_y = frac[2],
-      frac_z = frac[3],
-
-      # MM coordinates
-      mm_x = mm[1],
-      mm_y = mm[2],
-      mm_z = mm[3],
-
-      # Voxel coordinates (integer)
-      vox_x = voxel[1],
-      vox_y = voxel[2],
-      vox_z = voxel[3],
-
-      # Voxel coordinates (fractional)
-      vox_frac_x = voxel_frac[1],
-      vox_frac_y = voxel_frac[2],
-      vox_frac_z = voxel_frac[3],
-
-      # Metadata
-      plane = row$plane,
-      slice_num = slice_num,
-      image_id = row$image_id,
-      intensity = value
-    )
-  })
-
-  # Convert to data frame
-  do.call(rbind.data.frame, locations)
-}
+# map_gaze_to_anatomy <- function(integrated_data, nifti_data,
+#                                 row_indices = NULL,
+#                                 include_values = TRUE,
+#                                 adjust_coordinates = TRUE) {
+#
+#   # Validate input
+#   required_cols <- c("gaze_x", "gaze_y", "slice_index", "time_sec", "time_aligned", "plane")
+#   missing_cols <- setdiff(required_cols, names(integrated_data))
+#   if (length(missing_cols) > 0) {
+#     stop("Missing required columns in integrated_data: ", paste(missing_cols, collapse = ", "))
+#   }
+#
+#   if (is.null(row_indices)) {
+#     row_indices <- 1:nrow(integrated_data)
+#   }
+#
+#   # Get NVImage object
+#   nvimg <- nifti_data$nvimage
+#   img_data <- nifti_data$data
+#   dims <- nifti_data$dims
+#
+#   # Process each gaze point
+#   locations <- lapply(row_indices, function(i) {
+#     row <- integrated_data[i, ]
+#
+#     # Adjust coordinates if needed (for display frame)
+#     if (adjust_coordinates) {
+#       adjusted <- resolve_coordinates(row$gaze_x, row$gaze_y)
+#       gaze_x_adj <- adjusted$x
+#       gaze_y_adj <- adjusted$y
+#       in_bounds <- adjusted$in_bounds
+#     } else {
+#       gaze_x_adj <- row$gaze_x
+#       gaze_y_adj <- row$gaze_y
+#       in_bounds <- TRUE
+#     }
+#
+#     # Create fractional coordinates
+#     frac <- c(gaze_x_adj, gaze_y_adj, row$slice_index)
+#
+#     # Convert to mm coordinates
+#     mm_coords <- nvimg$convertFrac2MM(frac, isForceSliceMM = TRUE)
+#     mm <- mm_coords[1:3]
+#
+#     # Convert to voxel coordinates
+#     voxel <- nvimg$mm2vox(mm, frac = FALSE)
+#     voxel_frac <- nvimg$mm2vox(mm, frac = TRUE)
+#
+#     # Get actual slice number based on plane
+#     slice_num <- get_slice_number(row$slice_index, row$plane, dims)
+#
+#     # Extract intensity value if requested
+#     value <- NA
+#     if (include_values && isTRUE(in_bounds)) {
+#       value <- safe_get_value(img_data, voxel, dims)
+#     }
+#
+#     # Create location record
+#     list(
+#       # Original gaze data
+#       gaze_id = row$gaze_id,
+#       time_sec = row$time_sec,
+#       time_aligned = row$time_aligned,
+#
+#       # Original coordinates (Tobii frame)
+#       gaze_x_original = row$gaze_x,
+#       gaze_y_original = row$gaze_y,
+#
+#       # Adjusted coordinates (canvas)
+#       gaze_x = gaze_x_adj,
+#       gaze_y = gaze_y_adj,
+#       in_canvas = in_bounds,
+#
+#       slice_index = row$slice_index,
+#
+#       # Fractional coordinates (0-1)
+#       frac_x = frac[1],
+#       frac_y = frac[2],
+#       frac_z = frac[3],
+#
+#       # MM coordinates
+#       mm_x = mm[1],
+#       mm_y = mm[2],
+#       mm_z = mm[3],
+#
+#       # Voxel coordinates (integer)
+#       vox_x = voxel[1],
+#       vox_y = voxel[2],
+#       vox_z = voxel[3],
+#
+#       # Voxel coordinates (fractional)
+#       vox_frac_x = voxel_frac[1],
+#       vox_frac_y = voxel_frac[2],
+#       vox_frac_z = voxel_frac[3],
+#
+#       # Metadata
+#       plane = row$plane,
+#       slice_num = slice_num,
+#       image_id = row$image_id,
+#       intensity = value
+#     )
+#   })
+#
+#   # Convert to data frame
+#   do.call(rbind.data.frame, locations)
+# }
 
 #' Convert normalized slice index to actual slice number
 #'

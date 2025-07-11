@@ -4,7 +4,12 @@
 \alias{integrate_all_gaze_points}
 \title{Integrate gaze tracking data with z-axis slice information}
 \usage{
-integrate_all_gaze_points(gaze_data, z_axis, latency_correction = NULL)
+integrate_all_gaze_points(
+  gaze_data,
+  z_axis,
+  latency_correction = NULL,
+  image_bounds = NULL
+)
 }
 \arguments{
 \item{gaze_data}{Data frame containing gaze tracking data with columns:
@@ -23,11 +28,21 @@ integrate_all_gaze_points(gaze_data, z_axis, latency_correction = NULL)
 }}
 
 \item{latency_correction}{Optional manual latency correction in seconds}
+
+\item{image_bounds}{Optional list with image position in display area:
+\describe{
+\item{left}{Left edge of image (0-1)}
+\item{right}{Right edge of image (0-1)}
+\item{top}{Top edge of image (0-1)}
+\item{bottom}{Bottom edge of image (0-1)}
+}}
 }
 \value{
-Data frame with integrated gaze and slice information
+Data frame with integrated gaze and slice information, including
+adjusted gaze coordinates if image_bounds provided
 }
 \description{
 Aligns gaze tracking data temporally with z-axis events (slice changes)
 and assigns each gaze point to the slice being viewed at that time.
+Optionally transforms gaze coordinates based on image bounds.
 }

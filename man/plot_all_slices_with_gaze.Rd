@@ -28,5 +28,6 @@ Data frame with summary statistics per slice
 }
 \description{
 Creates a grid visualization showing all slices that were viewed,
-each overlaid with its corresponding gaze data.
+each overlaid with its corresponding gaze data. Uses pre-adjusted
+coordinates from integrate_all_gaze_points() if available.
 }

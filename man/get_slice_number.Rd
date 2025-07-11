@@ -2,7 +2,7 @@
 % Please edit documentation in R/coordinate-mapping.R
 \name{get_slice_number}
 \alias{get_slice_number}
-\title{Convert normalized slice index to actual slice number}
+\title{Map gaze coordinates to anatomical locations}
 \usage{
 get_slice_number(slice_index, plane, dims)
 }
@@ -12,10 +12,34 @@ get_slice_number(slice_index, plane, dims)
 \item{plane}{Imaging plane (AXIAL, SAGITTAL, CORONAL)}
 
 \item{dims}{Image dimensions}
+
+\item{integrated_data}{Data frame from integrate_all_gaze_points()}
+
+\item{nifti_data}{List from preload_nifti_data()}
+
+\item{row_indices}{Which rows to process (NULL for all)}
+
+\item{include_values}{Whether to extract intensity values at locations}
+
+\item{adjust_coordinates}{Whether to adjust coordinates for display frame (default TRUE)}
 }
 \value{
+Data frame with anatomical locations for each gaze point
+
 Slice number (1-based)
 }
 \description{
+Convert gaze tracking coordinates to anatomical locations in mm and voxel space.
+This provides similar functionality to the JavaScript locate() method.
+}
+\examples{
+\dontrun{
+# Map all gaze points to anatomical locations
+locations <- map_gaze_to_anatomy(integrated, nifti_data)
+
+# Map only specific rows
+locations <- map_gaze_to_anatomy(integrated, nifti_data, row_indices = 1:100)
+}
 Convert normalized slice index to actual slice number
+
 }

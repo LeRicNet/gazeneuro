@@ -28,5 +28,6 @@ Data frame of gaze points for the displayed slice
 }
 \description{
 Displays a NIfTI slice overlaid with gaze tracking data that was
-recorded while viewing that slice.
+recorded while viewing that slice. Uses pre-adjusted coordinates
+from integrate_all_gaze_points() if available.
 }

@@ -4,12 +4,14 @@
 \alias{analyze_gaze_by_slice}
 \title{Calculate gaze statistics by slice}
 \usage{
-analyze_gaze_by_slice(integrated_data, nifti_data = NULL)
+analyze_gaze_by_slice(integrated_data, nifti_data = NULL, use_adjusted = TRUE)
 }
 \arguments{
 \item{integrated_data}{Data frame from integrate_all_gaze_points()}
 
 \item{nifti_data}{Optional NIfTI data for dimension information}
+
+\item{use_adjusted}{Whether to use adjusted coordinates (if available)}
 }
 \value{
 Data frame with summary statistics per slice

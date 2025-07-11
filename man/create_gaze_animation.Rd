@@ -19,5 +19,6 @@ create_gaze_animation(
 }
 \description{
 Generates PNG frames showing gaze movement over time on NIfTI slices.
-Frames can be combined into a video using ffmpeg.
+Frames can be combined into a video using ffmpeg. Uses pre-adjusted
+coordinates from integrate_all_gaze_points() if available.
 }

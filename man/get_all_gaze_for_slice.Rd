@@ -8,7 +8,8 @@ get_all_gaze_for_slice(
   integrated_data,
   slice_num,
   plane = "AXIAL",
-  dims = c(512, 512, 25)
+  dims = c(512, 512, 25),
+  filter_bounds = TRUE
 )
 }
 \arguments{
@@ -19,6 +20,8 @@ get_all_gaze_for_slice(
 \item{plane}{Imaging plane (AXIAL, SAGITTAL, or CORONAL)}
 
 \item{dims}{Dimensions of the image (x, y, z)}
+
+\item{filter_bounds}{Whether to filter out points outside image bounds}
 }
 \value{
 Data frame of gaze points for the specified slice

@@ -9,7 +9,8 @@ The `gazeneuro` package provides tools for integrating eye tracking gaze data wi
 ## Features
 
 - **Temporal Integration**: Automatically align gaze tracking timestamps with neuroimaging slice viewing events
-- **Coordinate Transformation**: Convert between voxel, fractional, and world coordinates using gl-matrix style transformations
+- **Image Bounds Support**: Handle cases where the neuroimaging slice doesn't fill the entire display area
+- **Coordinate Transformation**: Convert between display, image, voxel, and world coordinates using gl-matrix style transformations
 - **Visualization Tools**: 
   - Overlay gaze data on individual brain slices
   - Create grid visualizations of all viewed slices
@@ -34,17 +35,90 @@ library(gazeneuro)
 # Load NIfTI data
 nifti_data <- preload_nifti_data("path/to/your/brain.nii.gz")
 
-# Integrate gaze tracking data with slice viewing events
-integrated <- integrate_all_gaze_points(gaze_data, z_axis_data)
+# Define image bounds if the image doesn't fill the display
+# (e.g., image occupies center 80% of display)
+image_bounds <- list(
+  left = 0.1,    # 10% margin on left
+  right = 0.9,   # 10% margin on right
+  top = 0.1,     # 10% margin on top
+  bottom = 0.9   # 10% margin on bottom
+)
 
-# Visualize gaze on a specific slice
+# Integrate gaze tracking data with slice viewing events
+# Image bounds are applied during integration
+integrated <- integrate_all_gaze_points(
+  gaze_data, 
+  z_axis_data,
+  image_bounds = image_bounds
+)
+
+# Visualize gaze on a specific slice (uses adjusted coordinates automatically)
 plot_slice_with_all_gaze(nifti_data, integrated, slice_num = 12)
 
 # Create a grid view of all viewed slices
 summary_stats <- plot_all_slices_with_gaze(nifti_data, integrated)
 
-# Generate animation frames
-create_gaze_animation(nifti_data, integrated, output_dir = "gaze_animation")
+# Map gaze to anatomical coordinates
+anatomical <- map_gaze_to_anatomy(nifti_data, integrated)
+```
+
+## Image Bounds and Coordinate Transformations
+
+### When to Use Image Bounds
+
+Image bounds are necessary when:
+- The neuroimaging slice has margins or padding in the display
+- The image is letterboxed/pillarboxed due to aspect ratio differences
+- The display includes UI elements (headers, footers, sidebars)
+- The image only occupies a portion of the screen
+
+### Coordinate Transformation Pipeline
+
+The package handles multiple coordinate systems:
+
+1. **Display Coordinates** (0-1): Raw gaze coordinates from eye tracker
+2. **Image Coordinates** (0-1): Adjusted for image position within display
+3. **Voxel Coordinates**: Integer indices into the NIfTI data array
+4. **World Coordinates** (mm): Physical positions in scanner space
+
+```r
+# The transformation pipeline:
+# Display coords → Image coords → Voxel coords → World coords
+
+# This happens automatically when you:
+integrated <- integrate_all_gaze_points(gaze_data, z_axis_data, 
+                                       image_bounds = image_bounds)
+
+# View the coordinate transformations:
+anatomical <- map_gaze_to_anatomy(integrated, nifti_data)
+anatomical %>%
+  select(gaze_x, gaze_y,              # Original display coords
+         gaze_x_adjusted, gaze_y_adjusted,  # Adjusted for image bounds
+         voxel_x, voxel_y, voxel_z,    # Voxel indices
+         world_x, world_y, world_z)     # World coordinates (mm)
+```
+
+### Automatic Bounds Detection
+
+If you don't know the exact image bounds, you can estimate them from the gaze data:
+
+```r
+# Function to detect bounds from gaze density
+detect_image_bounds <- function(gaze_data, threshold_pct = 2) {
+  x_bounds <- quantile(gaze_data$gaze_x, c(threshold_pct/100, 1-threshold_pct/100))
+  y_bounds <- quantile(gaze_data$gaze_y, c(threshold_pct/100, 1-threshold_pct/100))
+  
+  list(
+    left = x_bounds[1],
+    right = x_bounds[2], 
+    top = y_bounds[1],
+    bottom = y_bounds[2]
+  )
+}
+
+auto_bounds <- detect_image_bounds(gaze_data)
+integrated <- integrate_all_gaze_points(gaze_data, z_axis_data, 
+                                       image_bounds = auto_bounds)
 ```
 
 ## Data Format
@@ -66,7 +140,7 @@ The slice viewing event data should contain:
 
 ### Data Loading and Integration
 - `preload_nifti_data()`: Load NIfTI file with pre-extracted data
-- `integrate_all_gaze_points()`: Temporally align gaze with slice viewing
+- `integrate_all_gaze_points()`: Temporally align gaze with slice viewing, apply image bounds
 
 ### Visualization
 - `plot_slice_with_all_gaze()`: Plot single slice with gaze overlay
@@ -76,82 +150,12 @@ The slice viewing event data should contain:
 
 ### Analysis
 - `analyze_gaze_by_slice()`: Calculate gaze statistics per slice
+- `map_gaze_to_anatomy()`: Convert gaze to anatomical coordinates
 - `check_integration_quality()`: Diagnostic plots for integration quality
 
 ### Interactive Tools
 - `safe_coordinate_picker()`: Click on slices to get coordinates
 - `safe_quick_view()`: Quick slice viewer with coordinate info
-
-## Coordinate Mapping Functions
-
-### Anatomical Coordinate Conversion
-- `map_gaze_to_anatomy()`: Convert all gaze points to anatomical coordinates
-- `locate_single_point()`: Map a single gaze point (equivalent to JavaScript locate())
-- `batch_locate_gaze()`: Process and summarize gaze locations
-- `get_slice_number()`: Convert normalized slice indices to slice numbers
-
-### Utilities
-- `resolve_coordinates()`: Adjust coordinates for device pixel ratio and display frame
-- `safe_get_value()`: Safely extract intensity values from image data
-- `export_anatomical_locations()`: Export locations as CSV, JSON, or NIfTI heatmap
-
-### Display Frame Handling
-- `visualize_display_frame()`: Visualize the display layout
-- `plot_slice_with_validity()`: Show valid vs out-of-bounds gaze points
-
-## Coordinate Mapping Example
-
-The package now includes functions to map gaze coordinates to anatomical locations in neuroimaging space:
-
-```r
-# Map gaze points to anatomical coordinates
-anatomical_locations <- map_gaze_to_anatomy(integrated, nifti_data)
-
-# Find most-viewed brain regions
-most_viewed <- batch_locate_gaze(integrated, nifti_data, summarize = TRUE)
-
-# Map a single point (like JavaScript locate())
-location <- locate_single_point(
-  x = 0.5,  # gaze x (0-1)
-  y = 0.5,  # gaze y (0-1)
-  z = 0.5,  # slice position (0-1)
-  nifti_data = nifti_data
-)
-
-# Access coordinates
-print(location$mm)   # World coordinates in mm
-print(location$vox)  # Voxel indices
-print(location$values[[1]]$value)  # Intensity value
-
-# Export as NIfTI heatmap
-export_anatomical_locations(
-  anatomical_locations, 
-  "gaze_heatmap.nii.gz",
-  format = "nifti",
-  nifti_template = nifti_data
-)
-```
-
-### Display Frame Configuration
-
-The package handles a specific display setup where the image canvas (1924×1560) is positioned within a larger frame (2624×1640):
-
-```r
-# Visualize the display layout
-visualize_display_frame()
-
-# Check which gazes fall within the image canvas
-plot_slice_with_validity(nifti_data, integrated, slice_num = 12)
-```
-
-**Important**: When plotting gaze data, the package handles Y-axis inversion between Tobii coordinates (Y=0 at top) and plot coordinates (Y=0 at bottom) automatically.
-
-This allows you to:
-- Track which brain regions participants focused on
-- Filter out gazes that fall on screen borders
-- Create heatmaps of gaze density in anatomical space
-- Export data for analysis in other neuroimaging tools
-- Integrate eye tracking with brain imaging analysis pipelines
 
 ## Example Workflow
 
@@ -162,39 +166,64 @@ library(tidyverse)
 # 1. Load your data
 nifti_data <- preload_nifti_data("brain_scan.nii.gz")
 
-# 2. Integrate gaze tracking with slice viewing
-integrated <- integrate_all_gaze_points(
-  gaze_data = your_gaze_data,
-  z_axis = your_slice_events
+# 2. Define image bounds (if needed)
+# Example: letterboxed square image in 16:9 display
+display_aspect <- 16/9
+image_aspect <- 1
+image_width <- image_aspect / display_aspect
+
+image_bounds <- list(
+  left = (1 - image_width) / 2,
+  right = 1 - (1 - image_width) / 2,
+  top = 0,
+  bottom = 1
 )
 
-# 3. Check integration quality
+# 3. Integrate with image bounds
+integrated <- integrate_all_gaze_points(
+  gaze_data = your_gaze_data,
+  z_axis = your_slice_events,
+  image_bounds = image_bounds
+)
+
+# 4. Check integration quality
 check_integration_quality(your_gaze_data, your_slice_events, integrated)
 
-# 4. Analyze gaze patterns
+# 5. Analyze gaze patterns
+# Only analyzes points within image bounds
 gaze_stats <- analyze_gaze_by_slice(integrated, nifti_data)
 
-# 5. Create visualizations
-# Single slice with gaze
+# Check how many points were outside bounds
+integrated %>%
+  summarise(
+    total = n(),
+    within_bounds = sum(within_bounds),
+    outside_bounds = sum(!within_bounds),
+    pct_within = 100 * mean(within_bounds)
+  )
+
+# 6. Create visualizations
+# All functions automatically use adjusted coordinates
 plot_slice_with_all_gaze(nifti_data, integrated, slice_num = 15)
-
-# All viewed slices
 plot_all_slices_with_gaze(nifti_data, integrated, plane = "AXIAL")
-
-# Summary plots
 create_gaze_summary_plot(nifti_data, integrated)
 
-# 6. Export for further analysis
+# 7. Map to anatomical space
+anatomical <- map_gaze_to_anatomy(integrated, nifti_data)
+
+# 8. Export results
 write.csv(gaze_stats, "gaze_statistics.csv")
+write.csv(anatomical, "gaze_anatomical_coordinates.csv")
 ```
 
 ## Advanced Features
 
-### Coordinate Transformations
+### Coordinate Transformations with NVImage
+
 The package includes a complete implementation of gl-matrix operations for neuroimaging coordinate transformations:
 
 ```r
-# Create NVImage object for coordinate transformations
+# Access the NVImage object
 nvimg <- nifti_data$nvimage
 
 # Convert mm to voxel coordinates
@@ -204,11 +233,25 @@ voxel_coords <- nvimg$mm2vox(c(10, -20, 30))
 mm_coords <- nvimg$convertFrac2MM(c(0.5, 0.5, 0.5))
 ```
 
-### Interactive Coordinate Picker
+### Anatomical Region Lookup
+
+If you have an atlas file, you can identify anatomical regions:
+
 ```r
-# Click on image to get voxel and world coordinates
-clicked_points <- safe_coordinate_picker(nifti_data, slice = 20)
+# Load atlas
+atlas_data <- preload_nifti_data("atlas.nii.gz")
+
+# Get anatomical regions for gaze points
+regions <- get_anatomical_regions(anatomical_coords, atlas_data)
 ```
+
+## Tips for Image Bounds
+
+1. **Measure actual bounds**: Use a calibration image or known markers to determine exact bounds
+2. **Consider UI elements**: Account for any headers, footers, or sidebars in your display
+3. **Check aspect ratios**: Calculate letterbox/pillarbox bounds for mismatched aspect ratios
+4. **Validate with visualization**: Use `check_integration_quality()` to verify bounds are correct
+5. **Store bounds metadata**: Save image bounds with your experimental data for reproducibility
 
 ## Citation
 

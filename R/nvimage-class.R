@@ -131,6 +131,7 @@ NVImage <- R6::R6Class(
         stop("Must call calculateOblique() first")
       }
 
+      ## Need to take 1-frac[2] to invert axis back to voxel coordinates
       pos <- c(frac[1], frac[2], frac[3], 1)
 
       if (isForceSliceMM) {

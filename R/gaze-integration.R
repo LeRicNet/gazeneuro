@@ -3,43 +3,26 @@
 #' @description
 #' Aligns gaze tracking data temporally with z-axis events (slice changes)
 #' and assigns each gaze point to the slice being viewed at that time.
-#' Optionally transforms gaze coordinates based on image bounds.
+#' Uses COVERAGE-BASED detection for sparse events (not event count).
 #'
-#' @param gaze_data Data frame containing gaze tracking data with columns:
-#'   \describe{
-#'     \item{device_time_stamp}{Timestamp in microseconds}
-#'     \item{gaze_point_on_display_area_x}{X coordinate (0-1)}
-#'     \item{gaze_point_on_display_area_y}{Y coordinate (0-1)}
-#'   }
-#' @param z_axis Data frame containing z-axis slice information with columns:
-#'   \describe{
-#'     \item{client_timestamp}{Timestamp in milliseconds}
-#'     \item{plane}{Imaging plane (AXIAL, SAGITTAL, CORONAL)}
-#'     \item{index}{Normalized slice index (0-1)}
-#'     \item{image_id}{Image identifier}
-#'   }
+#' @param gaze_data Data frame containing gaze tracking data
+#' @param z_axis Data frame containing z-axis slice information
 #' @param latency_correction Optional manual latency correction in seconds
-#' @param image_bounds Optional list with image position in display area:
-#'   \describe{
-#'     \item{left}{Left edge of image (0-1)}
-#'     \item{right}{Right edge of image (0-1)}
-#'     \item{top}{Top edge of image (0-1)}
-#'     \item{bottom}{Bottom edge of image (0-1)}
-#'   }
+#' @param image_bounds Optional list with image position in display area
+#' @param coverage_threshold Coverage ratio below which to use sparse handling (default: 0.95)
 #'
-#' @return Data frame with integrated gaze and slice information, including
-#'   adjusted gaze coordinates if image_bounds provided
+#' @return Data frame with integrated gaze and slice information
 #' @export
-#' @importFrom dplyr mutate select filter arrange left_join group_by summarise
 integrate_all_gaze_points <- function(gaze_data, z_axis,
                                       latency_correction = NULL,
-                                      image_bounds = NULL) {
+                                      image_bounds = NULL,
+                                      coverage_threshold = 0.95) {
 
   # 1. Normalize timestamps to seconds from start
   gaze_clean <- gaze_data %>%
     mutate(
       time_sec = (device_time_stamp - min(device_time_stamp)) / 1e6,
-      gaze_id = row_number()  # Keep track of original gaze points
+      gaze_id = row_number()
     ) %>%
     select(gaze_id, time_sec, gaze_x = gaze_point_on_display_area_x,
            gaze_y = gaze_point_on_display_area_y, everything())
@@ -51,121 +34,234 @@ integrate_all_gaze_points <- function(gaze_data, z_axis,
     ) %>%
     select(z_event_id, time_sec, plane, slice_index = index, image_id, everything())
 
-  # 2. Calculate latency if not provided
-  if (is.null(latency_correction)) {
-    gaze_duration <- max(gaze_clean$time_sec)
-    z_duration <- max(z_clean$time_sec)
-    latency <- z_duration - gaze_duration
-  } else {
-    latency <- latency_correction
-  }
+  # Calculate gaze duration for use in all cases
+  gaze_duration <- max(gaze_clean$time_sec)
 
-  message("Integration Summary:")
-  message("────────────────────────────────────────")
-  message("Gaze points: ", nrow(gaze_clean))
-  message("Z-axis events: ", nrow(z_clean))
-  message("Gaze duration: ", round(max(gaze_clean$time_sec), 3), " sec")
-  message("Z-axis duration: ", round(max(z_clean$time_sec), 3), " sec")
-  message("Estimated latency: ", round(latency, 3), " sec")
+  # Check for single z-axis event case
+  if (nrow(z_clean) == 1) {
+    message("Integration Summary:")
+    message("────────────────────────────────────────")
+    message("Gaze points: ", nrow(gaze_clean))
+    message("Z-axis events: ", nrow(z_clean))
+    message("Gaze duration: ", round(gaze_duration, 3), " sec")
+    message("Z-axis duration: N/A (single event)")
+    message("SINGLE EVENT MODE: Treating slice position as constant")
+    message("")
 
-  if (!is.null(image_bounds)) {
-    message("Image bounds provided: left=", round(image_bounds$left, 3),
-            ", right=", round(image_bounds$right, 3),
-            ", top=", round(image_bounds$top, 3),
-            ", bottom=", round(image_bounds$bottom, 3))
-  }
-  message("")
-
-  # Apply latency correction to gaze
-  gaze_clean$time_aligned <- gaze_clean$time_sec + latency
-
-  # 3. For each gaze point, find which slice was being viewed
-  # Create intervals from z-axis events
-  z_intervals <- z_clean %>%
-    arrange(time_sec) %>%
-    mutate(
-      time_start = time_sec,
-      time_end = lead(time_sec, default = max(time_sec) + 1)
-    )
-
-  # Method 1: Using a join approach (faster for large data)
-  integrated <- gaze_clean %>%
-    mutate(dummy = 1) %>%
-    left_join(z_intervals %>% mutate(dummy = 1), by = "dummy") %>%
-    filter(
-      time_aligned >= time_start,
-      time_aligned < time_end
-    ) %>%
-    select(-dummy, -time_start, -time_end)
-
-  # Alternative Method 2: Using cut() (if Method 1 has issues)
-  if (nrow(integrated) == 0) {
-    message("Using alternative integration method...")
-
-    # Create breaks from z-axis events
-    breaks <- c(-Inf, z_intervals$time_sec, Inf)
-
-    # Assign each gaze point to an interval
-    gaze_clean$interval <- cut(gaze_clean$time_aligned,
-                               breaks = breaks,
-                               labels = FALSE,
-                               right = FALSE)
-
-    # Merge with z-axis data
+    # Assign ALL gaze points to the single slice position
     integrated <- gaze_clean %>%
-      mutate(z_event_id = pmin(interval, nrow(z_intervals))) %>%
-      left_join(z_intervals, by = "z_event_id")
+      mutate(
+        time_aligned = time_sec,
+        z_event_id = 1,
+        plane = z_clean$plane[1],
+        slice_index = z_clean$slice_index[1],
+        image_id = z_clean$image_id[1],
+        time_start = min(time_sec),
+        time_end = max(time_sec),
+        integration_mode = "single_event",
+        coverage_ratio = NA_real_
+      )
+
+    message("Integration Results:")
+    message("────────────────────────────────────────")
+    message("Gaze points matched: ", nrow(integrated), " (100%)")
+    message("All gaze points assigned to: ", z_clean$plane[1],
+            " slice ", round(z_clean$slice_index[1], 3))
+
+  } else {
+    # Multiple events - check temporal coverage
+    z_duration <- max(z_clean$time_sec)
+    coverage_ratio <- z_duration / gaze_duration
+
+    # CRITICAL: Use coverage ratio, not event count!
+    if (coverage_ratio < coverage_threshold) {
+      # Sparse COVERAGE mode (works for ANY event count)
+      message("Integration Summary:")
+      message("────────────────────────────────────────")
+      message("Gaze points: ", nrow(gaze_clean))
+      message("Z-axis events: ", nrow(z_clean))
+      message("Gaze duration: ", round(gaze_duration, 3), " sec")
+      message("Z-axis duration: ", round(z_duration, 3), " sec")
+      message("Coverage ratio: ", round(100 * coverage_ratio, 1), "%")
+      message("SPARSE COVERAGE MODE: Events span only ",
+              round(100 * coverage_ratio, 1), "% of gaze duration")
+      message("Extending intervals to cover full gaze span")
+      message("")
+
+      # For sparse coverage, don't use latency correction
+      if (is.null(latency_correction)) {
+        latency <- 0
+        message("Latency: 0 sec (disabled for sparse coverage)")
+      } else {
+        latency <- latency_correction
+        message("Latency: ", round(latency, 3), " sec (user-specified)")
+      }
+
+      # Apply latency correction (usually 0 for sparse)
+      gaze_clean$time_aligned <- gaze_clean$time_sec + latency
+
+      # Create intervals with last interval extending to end of gaze recording
+      z_intervals <- z_clean %>%
+        arrange(time_sec) %>%
+        mutate(
+          time_start = time_sec,
+          # KEY CHANGE: Extend last interval to cover all gaze data
+          time_end = lead(time_sec, default = max(gaze_clean$time_aligned) + 1)
+        )
+
+      message("Interval coverage: ", round(min(z_intervals$time_start), 2), " to ",
+              round(max(z_intervals$time_end), 2), " sec")
+      message("")
+
+      # Join gaze with z-axis intervals
+      integrated <- gaze_clean %>%
+        mutate(dummy = 1) %>%
+        left_join(z_intervals %>% mutate(dummy = 1), by = "dummy") %>%
+        filter(
+          time_aligned >= time_start,
+          time_aligned < time_end
+        ) %>%
+        select(-dummy) %>%
+        mutate(
+          integration_mode = "sparse_coverage",
+          coverage_ratio = coverage_ratio
+        )
+
+      # Alternative method if first fails
+      if (nrow(integrated) == 0) {
+        message("Using alternative integration method...")
+        breaks <- c(-Inf, z_intervals$time_sec, Inf)
+        gaze_clean$interval <- cut(gaze_clean$time_aligned,
+                                   breaks = breaks,
+                                   labels = FALSE,
+                                   right = FALSE)
+        integrated <- gaze_clean %>%
+          mutate(z_event_id = pmin(interval, nrow(z_intervals))) %>%
+          left_join(z_intervals, by = "z_event_id") %>%
+          mutate(
+            integration_mode = "sparse_coverage_alt",
+            coverage_ratio = coverage_ratio
+          )
+      }
+
+      message("Integration Results:")
+      message("────────────────────────────────────────")
+      message("Gaze points matched: ", nrow(integrated),
+              sprintf(" (%.1f%%)", 100 * nrow(integrated) / nrow(gaze_clean)))
+
+      unmatched <- nrow(gaze_clean) - nrow(integrated)
+      if (unmatched > 0) {
+        message("Unmatched gaze points: ", unmatched)
+        message("(These occurred before first z-axis event)")
+      }
+
+    } else {
+      # Good coverage - use normal latency-based integration
+
+      # Calculate latency if not provided
+      if (is.null(latency_correction)) {
+        latency <- z_duration - gaze_duration
+      } else {
+        latency <- latency_correction
+      }
+
+      message("Integration Summary:")
+      message("────────────────────────────────────────")
+      message("Gaze points: ", nrow(gaze_clean))
+      message("Z-axis events: ", nrow(z_clean))
+      message("Gaze duration: ", round(gaze_duration, 3), " sec")
+      message("Z-axis duration: ", round(z_duration, 3), " sec")
+      message("Coverage ratio: ", round(100 * coverage_ratio, 1), "%")
+      message("Estimated latency: ", round(latency, 3), " sec")
+
+      if (!is.null(image_bounds)) {
+        message("Image bounds provided: left=", round(image_bounds$left, 3),
+                ", right=", round(image_bounds$right, 3),
+                ", top=", round(image_bounds$top, 3),
+                ", bottom=", round(image_bounds$bottom, 3))
+      }
+      message("")
+
+      # Apply latency correction to gaze
+      gaze_clean$time_aligned <- gaze_clean$time_sec + latency
+
+      # Create intervals from z-axis events
+      z_intervals <- z_clean %>%
+        arrange(time_sec) %>%
+        mutate(
+          time_start = time_sec,
+          time_end = lead(time_sec, default = max(time_sec) + 1)
+        )
+
+      # Join gaze with z-axis intervals
+      integrated <- gaze_clean %>%
+        mutate(dummy = 1) %>%
+        left_join(z_intervals %>% mutate(dummy = 1), by = "dummy") %>%
+        filter(
+          time_aligned >= time_start,
+          time_aligned < time_end
+        ) %>%
+        select(-dummy) %>%
+        mutate(
+          integration_mode = "normal",
+          coverage_ratio = coverage_ratio
+        )
+
+      # Alternative method if first fails
+      if (nrow(integrated) == 0) {
+        message("Using alternative integration method...")
+        breaks <- c(-Inf, z_intervals$time_sec, Inf)
+        gaze_clean$interval <- cut(gaze_clean$time_aligned,
+                                   breaks = breaks,
+                                   labels = FALSE,
+                                   right = FALSE)
+        integrated <- gaze_clean %>%
+          mutate(z_event_id = pmin(interval, nrow(z_intervals))) %>%
+          left_join(z_intervals, by = "z_event_id") %>%
+          mutate(
+            integration_mode = "normal_alt",
+            coverage_ratio = coverage_ratio
+          )
+      }
+
+      message("Integration Results:")
+      message("────────────────────────────────────────")
+      message("Gaze points matched: ", nrow(integrated),
+              sprintf(" (%.1f%%)", 100 * nrow(integrated) / nrow(gaze_clean)))
+
+      unmatched <- nrow(gaze_clean) - nrow(integrated)
+      if (unmatched > 0) {
+        message("Unmatched gaze points: ", unmatched)
+        message("(These may be before first or after last z-axis event)")
+      }
+    }
   }
 
   # 4. Apply image bounds transformation if provided
   if (!is.null(image_bounds)) {
-    # Calculate image dimensions within display
     image_width <- image_bounds$right - image_bounds$left
     image_height <- image_bounds$bottom - image_bounds$top
 
     integrated <- integrated %>%
       mutate(
-        # Transform display coordinates to image space (0-1)
         gaze_x_adjusted = (gaze_x - image_bounds$left) / image_width,
         gaze_y_adjusted = (gaze_y - image_bounds$top) / image_height,
-
-        # Flag points that are within image bounds
         within_bounds = gaze_x_adjusted >= 0 & gaze_x_adjusted <= 1 &
           gaze_y_adjusted >= 0 & gaze_y_adjusted <= 1
       )
 
-    # Report how many points are outside bounds
     n_outside <- sum(!integrated$within_bounds)
     if (n_outside > 0) {
       message(sprintf("Note: %d gaze points (%.1f%%) fall outside image bounds",
                       n_outside, 100 * n_outside / nrow(integrated)))
     }
   } else {
-    # No image bounds - use original coordinates
     integrated <- integrated %>%
       mutate(
         gaze_x_adjusted = gaze_x,
         gaze_y_adjusted = gaze_y,
         within_bounds = TRUE
       )
-  }
-
-  message("Integration Results:")
-  message("────────────────────────────────────────")
-  message("Gaze points matched: ", nrow(integrated),
-          sprintf(" (%.1f%%)", 100 * nrow(integrated) / nrow(gaze_clean)))
-
-  if (!is.null(image_bounds)) {
-    n_within <- sum(integrated$within_bounds)
-    message("Gaze points within image bounds: ", n_within,
-            sprintf(" (%.1f%%)", 100 * n_within / nrow(integrated)))
-  }
-
-  # Check for unmatched points
-  unmatched <- nrow(gaze_clean) - nrow(integrated)
-  if (unmatched > 0) {
-    message("Unmatched gaze points: ", unmatched)
-    message("(These may be before first or after last z-axis event)")
   }
 
   return(integrated)

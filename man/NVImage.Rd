@@ -32,8 +32,10 @@ using gl-matrix style transformations.
 \itemize{
 \item \href{#method-NVImage-new}{\code{NVImage$new()}}
 \item \href{#method-NVImage-mm2vox}{\code{NVImage$mm2vox()}}
+\item \href{#method-NVImage-vox2mm}{\code{NVImage$vox2mm()}}
 \item \href{#method-NVImage-calculateOblique}{\code{NVImage$calculateOblique()}}
 \item \href{#method-NVImage-convertFrac2MM}{\code{NVImage$convertFrac2MM()}}
+\item \href{#method-NVImage-convertMM2Frac}{\code{NVImage$convertMM2Frac()}}
 \item \href{#method-NVImage-clone}{\code{NVImage$clone()}}
 }
 }
@@ -84,6 +86,26 @@ Numeric vector of voxel coordinates
 }
 }
 \if{html}{\out{<hr>}}
+\if{html}{\out{<a id="method-NVImage-vox2mm"></a>}}
+\if{latex}{\out{\hypertarget{method-NVImage-vox2mm}{}}}
+\subsection{Method \code{vox2mm()}}{
+Convert voxel coordinates to mm coordinates
+\subsection{Usage}{
+\if{html}{\out{<div class="r">}}\preformatted{NVImage$vox2mm(vox)}\if{html}{\out{</div>}}
+}
+
+\subsection{Arguments}{
+\if{html}{\out{<div class="arguments">}}
+\describe{
+\item{\code{vox}}{Numeric vector of voxel coordinates (x, y, z)}
+}
+\if{html}{\out{</div>}}
+}
+\subsection{Returns}{
+Numeric vector of mm coordinates
+}
+}
+\if{html}{\out{<hr>}}
 \if{html}{\out{<a id="method-NVImage-calculateOblique"></a>}}
 \if{latex}{\out{\hypertarget{method-NVImage-calculateOblique}{}}}
 \subsection{Method \code{calculateOblique()}}{
@@ -114,6 +136,27 @@ Convert fractional coordinates to mm
 }
 \subsection{Returns}{
 Numeric vector of mm coordinates
+}
+}
+\if{html}{\out{<hr>}}
+\if{html}{\out{<a id="method-NVImage-convertMM2Frac"></a>}}
+\if{latex}{\out{\hypertarget{method-NVImage-convertMM2Frac}{}}}
+\subsection{Method \code{convertMM2Frac()}}{
+Convert mm coordinates to fractional coordinates
+This is the inverse of convertFrac2MM with isForceSliceMM=TRUE
+\subsection{Usage}{
+\if{html}{\out{<div class="r">}}\preformatted{NVImage$convertMM2Frac(mm)}\if{html}{\out{</div>}}
+}
+
+\subsection{Arguments}{
+\if{html}{\out{<div class="arguments">}}
+\describe{
+\item{\code{mm}}{Numeric vector of mm coordinates (x, y, z)}
+}
+\if{html}{\out{</div>}}
+}
+\subsection{Returns}{
+Numeric vector of fractional coordinates (0-1)
 }
 }
 \if{html}{\out{<hr>}}

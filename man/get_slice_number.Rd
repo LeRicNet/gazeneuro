@@ -2,44 +2,29 @@
 % Please edit documentation in R/coordinate-mapping.R
 \name{get_slice_number}
 \alias{get_slice_number}
-\title{Map gaze coordinates to anatomical locations}
+\title{Get slice number from normalized index}
 \usage{
-get_slice_number(slice_index, plane, dims)
+get_slice_number(normalized_index, n_slices, method = "round")
 }
 \arguments{
-\item{slice_index}{Normalized slice index (0-1)}
+\item{normalized_index}{Slice index as fraction (0-1)}
 
-\item{plane}{Imaging plane (AXIAL, SAGITTAL, CORONAL)}
+\item{n_slices}{Total number of slices}
 
-\item{dims}{Image dimensions}
-
-\item{integrated_data}{Data frame from integrate_all_gaze_points()}
-
-\item{nifti_data}{List from preload_nifti_data()}
-
-\item{row_indices}{Which rows to process (NULL for all)}
-
-\item{include_values}{Whether to extract intensity values at locations}
-
-\item{adjust_coordinates}{Whether to adjust coordinates for display frame (default TRUE)}
+\item{method}{Rounding method: "round" (default), "floor", or "ceiling"}
 }
 \value{
-Data frame with anatomical locations for each gaze point
-
-Slice number (1-based)
+Integer slice number (1-based)
 }
 \description{
-Convert gaze tracking coordinates to anatomical locations in mm and voxel space.
-This provides similar functionality to the JavaScript locate() method.
+Converts a normalized slice index (0-1) to an integer slice number (1-based).
+Handles boundary cases and rounding consistently.
 }
-\examples{
-\dontrun{
-# Map all gaze points to anatomical locations
-locations <- map_gaze_to_anatomy(integrated, nifti_data)
-
-# Map only specific rows
-locations <- map_gaze_to_anatomy(integrated, nifti_data, row_indices = 1:100)
+\details{
+The normalized index maps linearly to slice numbers:
+\itemize{
+\item index = 0 → slice 1 (first slice)
+\item index = 1 → slice n_slices (last slice)
+\item index = 0.5 → middle slice
 }
-Convert normalized slice index to actual slice number
-
 }

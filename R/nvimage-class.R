@@ -68,6 +68,24 @@ NVImage <- R6::R6Class(
     },
 
     #' @description
+    #' Convert voxel coordinates to mm coordinates
+    #' @param vox Numeric vector of voxel coordinates (x, y, z)
+    #' @return Numeric vector of mm coordinates
+    vox2mm = function(vox) {
+      if (is.null(self$matRAS)) {
+        stop("matRAS undefined")
+      }
+
+      sform <- mat4_clone(self$matRAS)
+      sform <- mat4_transpose(sform)
+
+      pos <- c(vox[1], vox[2], vox[3], 1)
+      pos <- vec4_transformMat4(pos, sform)
+
+      return(pos[1:3])
+    },
+
+    #' @description
     #' Calculate oblique transformation matrices
     #' Sets up frac2mm and frac2mmOrtho matrices for coordinate transformations
     calculateOblique = function() {
@@ -80,6 +98,8 @@ NVImage <- R6::R6Class(
       sform <- mat4_clone(self$matRAS)
       sform <- mat4_transpose(sform)
 
+      # The -0.5 shim accounts for voxel center convention:
+      # frac=0 maps to center of first voxel, not its corner
       shim <- c(-0.5, -0.5, -0.5)
       sform <- mat4_translate(sform, shim)
 
@@ -131,7 +151,6 @@ NVImage <- R6::R6Class(
         stop("Must call calculateOblique() first")
       }
 
-      ## Need to take 1-frac[2] to invert axis back to voxel coordinates
       pos <- c(frac[1], frac[2], frac[3], 1)
 
       if (isForceSliceMM) {
@@ -142,6 +161,25 @@ NVImage <- R6::R6Class(
 
       pos_transformed <- vec4_transformMat4(pos, transformation_matrix)
       return(pos_transformed)
+    },
+
+    #' @description
+    #' Convert mm coordinates to fractional coordinates
+    #' This is the inverse of convertFrac2MM with isForceSliceMM=TRUE
+    #' @param mm Numeric vector of mm coordinates (x, y, z)
+    #' @return Numeric vector of fractional coordinates (0-1)
+    convertMM2Frac = function(mm) {
+      if (is.null(self$frac2mm)) {
+        stop("Must call calculateOblique() first")
+      }
+
+      # Invert frac2mm to get mm2frac
+      mm2frac <- mat4_invert(self$frac2mm)
+
+      pos <- c(mm[1], mm[2], mm[3], 1)
+      pos_transformed <- vec4_transformMat4(pos, mm2frac)
+
+      return(pos_transformed[1:3])
     }
   )
 )

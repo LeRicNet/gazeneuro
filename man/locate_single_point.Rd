@@ -2,37 +2,43 @@
 % Please edit documentation in R/coordinate-mapping.R
 \name{locate_single_point}
 \alias{locate_single_point}
-\title{Create anatomical location for a single gaze point}
+\title{Coordinate Mapping Functions for Gaze-Neuroimaging Integration}
 \usage{
 locate_single_point(
-  x,
-  y,
-  z,
+  gaze_x,
+  gaze_y,
+  slice_num,
   nifti_data,
   plane = "AXIAL",
-  timestamp_us = NULL,
-  adjust_coordinates = TRUE
+  display_bounds = NULL
 )
 }
 \arguments{
-\item{x}{Gaze x coordinate (0-1 normalized to full display)}
+\item{gaze_x}{Gaze X coordinate (0-1, normalized display width)}
 
-\item{y}{Gaze y coordinate (0-1 normalized to full display)}
+\item{gaze_y}{Gaze Y coordinate (0-1, normalized display height)}
 
-\item{z}{Normalized slice position (0-1)}
+\item{slice_num}{Current slice number being viewed (1-based)}
 
-\item{nifti_data}{List from preload_nifti_data()}
+\item{nifti_data}{List from preload_nifti_data() containing nvimage object}
 
-\item{plane}{Imaging plane}
+\item{plane}{Imaging plane (AXIAL, SAGITTAL, or CORONAL)}
 
-\item{timestamp_us}{Timestamp in microseconds}
-
-\item{adjust_coordinates}{Whether to adjust for display frame (default TRUE)}
+\item{display_bounds}{Optional list with xmin, xmax, ymin, ymax of display area}
 }
 \value{
-List with location information
+Named list with:
+\item{voxel}{Voxel coordinates (i, j, k)}
+\item{mm}{World coordinates in mm (x, y, z)}
+\item{frac}{Fractional coordinates (0-1)}
+\item{valid}{Logical indicating if coordinates are within image bounds}
 }
 \description{
-This is equivalent to the JavaScript locate() function for a single point.
-Takes gaze coordinates and returns anatomical location information.
+Maps a gaze coordinate (in normalized display space) to the corresponding
+voxel location in the brain image, given the current slice being viewed.
+}
+\details{
+Functions for mapping gaze coordinates to brain slice coordinates
+and determining slice membership.
+Locate a single gaze point on a brain slice
 }

@@ -8,41 +8,26 @@ integrate_all_gaze_points(
   gaze_data,
   z_axis,
   latency_correction = NULL,
-  image_bounds = NULL
+  image_bounds = NULL,
+  coverage_threshold = 0.95
 )
 }
 \arguments{
-\item{gaze_data}{Data frame containing gaze tracking data with columns:
-\describe{
-\item{device_time_stamp}{Timestamp in microseconds}
-\item{gaze_point_on_display_area_x}{X coordinate (0-1)}
-\item{gaze_point_on_display_area_y}{Y coordinate (0-1)}
-}}
+\item{gaze_data}{Data frame containing gaze tracking data}
 
-\item{z_axis}{Data frame containing z-axis slice information with columns:
-\describe{
-\item{client_timestamp}{Timestamp in milliseconds}
-\item{plane}{Imaging plane (AXIAL, SAGITTAL, CORONAL)}
-\item{index}{Normalized slice index (0-1)}
-\item{image_id}{Image identifier}
-}}
+\item{z_axis}{Data frame containing z-axis slice information}
 
 \item{latency_correction}{Optional manual latency correction in seconds}
 
-\item{image_bounds}{Optional list with image position in display area:
-\describe{
-\item{left}{Left edge of image (0-1)}
-\item{right}{Right edge of image (0-1)}
-\item{top}{Top edge of image (0-1)}
-\item{bottom}{Bottom edge of image (0-1)}
-}}
+\item{image_bounds}{Optional list with image position in display area}
+
+\item{coverage_threshold}{Coverage ratio below which to use sparse handling (default: 0.95)}
 }
 \value{
-Data frame with integrated gaze and slice information, including
-adjusted gaze coordinates if image_bounds provided
+Data frame with integrated gaze and slice information
 }
 \description{
 Aligns gaze tracking data temporally with z-axis events (slice changes)
 and assigns each gaze point to the slice being viewed at that time.
-Optionally transforms gaze coordinates based on image bounds.
+Uses COVERAGE-BASED detection for sparse events (not event count).
 }

@@ -88,8 +88,53 @@ test_that("Integration with invalid data fails gracefully", {
   expect_error(integrate_all_gaze_points(bad_gaze, bad_z))
 })
 
-test_that("Coordinate transformations are reversible", {
+test_that("Coordinate transformations are consistent with voxel center convention", {
+  # Create test NVImage with simple transformation
+  test_mat <- diag(4)
+  test_mat[1:3, 4] <- c(-90, -126, -72)  # Translation only
+
+  nvimg <- NVImage$new(
+    matRAS = test_mat,
+    dimsRAS = c(3, 182, 218, 182),
+    pixDimsRAS = c(1, 1, 1, 1)
+  )
+  nvimg$calculateOblique()
+
+  # Test that frac2mm and mm2frac are inverses
+  # The frac2mm matrix includes a -0.5 offset for voxel center convention
+  # To test round-trip, we must use the same transformation in both directions
+
+  # Forward: mm -> frac using inverse of frac2mm
+  original_mm <- c(10, 20, 30)
+  frac <- nvimg$convertMM2Frac(original_mm)
+
+  # Backward: frac -> mm using frac2mm
+  recovered_mm <- nvimg$convertFrac2MM(frac, isForceSliceMM = TRUE)
+
+  # Check if close (within numerical precision)
+  expect_equal(recovered_mm[1:3], original_mm, tolerance = 1e-5)
+})
+
+test_that("vox2mm and mm2vox are inverses", {
   # Create test NVImage
+  test_mat <- diag(4)
+  test_mat[1:3, 4] <- c(-90, -126, -72)
+
+  nvimg <- NVImage$new(
+    matRAS = test_mat,
+    dimsRAS = c(3, 182, 218, 182),
+    pixDimsRAS = c(1, 1, 1, 1)
+  )
+
+  # Test round-trip: mm -> vox -> mm (using vox2mm which applies matRAS directly)
+  original_mm <- c(10, 20, 30)
+  voxel <- nvimg$mm2vox(original_mm, frac = TRUE)
+  recovered_mm <- nvimg$vox2mm(voxel)
+
+  expect_equal(recovered_mm, original_mm, tolerance = 1e-10)
+})
+
+test_that("Fractional coordinates are bounded correctly", {
   test_mat <- diag(4)
   test_mat[1:3, 4] <- c(-90, -126, -72)
 
@@ -100,16 +145,70 @@ test_that("Coordinate transformations are reversible", {
   )
   nvimg$calculateOblique()
 
-  # Test round-trip conversion
-  original_mm <- c(10, 20, 30)
-  voxel <- nvimg$mm2vox(original_mm, frac = TRUE)
+  # Center of volume should be frac = (0.5, 0.5, 0.5)
+  center_frac <- c(0.5, 0.5, 0.5)
+  center_mm <- nvimg$convertFrac2MM(center_frac, isForceSliceMM = TRUE)
 
-  # Convert voxel to fractional
-  frac <- voxel / nvimg$dimsRAS[2:4]
+  # For identity rotation with translation (-90, -126, -72):
+  # frac=0.5 should map to voxel center of (91, 109, 91)
+  # Then mm = voxel + origin = (91-90, 109-126, 91-72) = (1, -17, 19)
+  # But with -0.5 shim: voxel_effective = (91-0.5, 109-0.5, 91-0.5) = (90.5, 108.5, 90.5)
+  # mm = (90.5-90, 108.5-126, 90.5-72) = (0.5, -17.5, 18.5)
 
-  # Convert back to mm
-  recovered_mm <- nvimg$convertFrac2MM(frac, isForceSliceMM = TRUE)
+  # The center of the image in mm coordinates
+  expected_center_mm <- c(0.5, -17.5, 18.5)
+  expect_equal(center_mm[1:3], expected_center_mm, tolerance = 1e-5)
+})
 
-  # Check if close (within numerical precision)
-  expect_equal(recovered_mm[1:3], original_mm, tolerance = 1e-5)
+test_that("Edge voxels map correctly", {
+  test_mat <- diag(4)
+  test_mat[1:3, 4] <- c(-90, -126, -72)
+
+  nvimg <- NVImage$new(
+    matRAS = test_mat,
+    dimsRAS = c(3, 182, 218, 182),
+    pixDimsRAS = c(1, 1, 1, 1)
+  )
+  nvimg$calculateOblique()
+
+  # frac = (0, 0, 0) should map to center of first voxel
+  # With -0.5 shim: voxel = (-0.5, -0.5, -0.5)
+  # mm = voxel + origin = (-0.5-90, -0.5-126, -0.5-72) = (-90.5, -126.5, -72.5)
+  first_voxel_mm <- nvimg$convertFrac2MM(c(0, 0, 0), isForceSliceMM = TRUE)
+  expected_first <- c(-90.5, -126.5, -72.5)
+  expect_equal(first_voxel_mm[1:3], expected_first, tolerance = 1e-5)
+
+  # frac = (1, 1, 1) should map to center of last voxel
+  # With dims (182, 218, 182) and -0.5 shim:
+  # voxel = (182-0.5, 218-0.5, 182-0.5) = (181.5, 217.5, 181.5)
+  # mm = voxel + origin = (181.5-90, 217.5-126, 181.5-72) = (91.5, 91.5, 109.5)
+  last_voxel_mm <- nvimg$convertFrac2MM(c(1, 1, 1), isForceSliceMM = TRUE)
+  expected_last <- c(91.5, 91.5, 109.5)
+  expect_equal(last_voxel_mm[1:3], expected_last, tolerance = 1e-5)
+})
+
+test_that("Pixel dimensions affect coordinate transformations", {
+  test_mat <- diag(4)
+  test_mat[1:3, 4] <- c(0, 0, 0)  # No translation for simplicity
+
+  # Create with anisotropic voxels
+  nvimg <- NVImage$new(
+    matRAS = test_mat,
+    dimsRAS = c(3, 100, 100, 50),  # Different z dimension
+    pixDimsRAS = c(1, 1, 1, 2)     # z voxels are 2mm thick
+  )
+  nvimg$calculateOblique()
+
+  # Check that extents are calculated correctly
+  # X extent: 100 * 1mm = 100mm
+  # Y extent: 100 * 1mm = 100mm
+  # Z extent: 50 * 2mm = 100mm
+
+  x_extent <- nvimg$extentsMaxOrtho[1] - nvimg$extentsMinOrtho[1]
+  y_extent <- nvimg$extentsMaxOrtho[2] - nvimg$extentsMinOrtho[2]
+  z_extent <- nvimg$extentsMaxOrtho[3] - nvimg$extentsMinOrtho[3]
+
+  expect_equal(x_extent, 100, tolerance = 1e-5)
+  expect_equal(y_extent, 100, tolerance = 1e-5)
+  expect_equal(z_extent, 100, tolerance = 1e-5)
 })

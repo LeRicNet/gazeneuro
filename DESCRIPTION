@@ -21,7 +21,8 @@ Imports:
     dplyr,
     tidyr,
     MASS,
-    rlang
+    rlang,
+    zoo
 LinkingTo: 
     Rcpp
 Suggests: 

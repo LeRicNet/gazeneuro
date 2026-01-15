@@ -1,3 +1,7 @@
 ^.*\.Rproj$
 ^\.Rproj\.user$
 ^LICENSE\.md$
+^experiments\$
+^experiment1_data\$
+^gaze_animation\$
+^examples\$

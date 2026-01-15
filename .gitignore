@@ -7,3 +7,13 @@
 inst/doc
 gaze_animation
 data
+results
+coordinate_validation
+experiment1_data
+stress_test_results
+
+# But keep directory structure
+!results/.gitkeep
+!coordinate_validation/.gitkeep
+!experiment1_data/.gitkeep
+!stress_test_results/.gitkeep
